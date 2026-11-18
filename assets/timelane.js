@@ -583,7 +583,7 @@ const wheelLinesPerHour = 3;
 const syncInterval = 120_000;
 const currentClock = createCurrentClock();
 const clockSource = $('clock-source');
-const clockSourceIcon = clockSource.querySelector('button');
+const clockSourceIcon = clockSource.querySelector('.clock-source-icon');
 const initialTime = currentClock.now();
 let state = createClockState(initialTime), slots = [], selectedInstant = null, hoverInstant = null;
 let visibleHours, displayedWindow, followingNow = true;
