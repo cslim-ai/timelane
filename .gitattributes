@@ -1,0 +1,3 @@
+# Keep browser bundle verification byte-for-byte consistent across checkouts.
+/src/*.js text eol=lf
+/assets/timelane.js text eol=lf

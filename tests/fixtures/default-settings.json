@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "groups": [
+    {
+      "id": "default",
+      "name": "나의 시간대",
+      "locations": [
+        {
+          "id": "seoul",
+          "label": "",
+          "workStart": 540,
+          "workEnd": 1080,
+          "weekend": [
+            0,
+            6
+          ]
+        },
+        {
+          "id": "london",
+          "label": "",
+          "workStart": 540,
+          "workEnd": 1080,
+          "weekend": [
+            0,
+            6
+          ]
+        },
+        {
+          "id": "new-york",
+          "label": "",
+          "workStart": 540,
+          "workEnd": 1080,
+          "weekend": [
+            0,
+            6
+          ]
+        },
+        {
+          "id": "san-francisco",
+          "label": "",
+          "workStart": 540,
+          "workEnd": 1080,
+          "weekend": [
+            0,
+            6
+          ]
+        }
+      ]
+    }
+  ],
+  "activeGroupId": "default",
+  "date": "2026-11-18",
+  "selection": null,
+  "format": "24",
+  "showZones": true,
+  "markWeekends": true,
+  "title": "",
+  "notes": ""
+}
