@@ -11,12 +11,16 @@ const text = messages[locale];
 const referenceDate = new Intl.DateTimeFormat(locale, { timeZone: SEOUL_ZONE, year: 'numeric', month: 'short', day: 'numeric', weekday: 'short' });
 const maxVisibleHours = 25;
 const dragThreshold = 8;
+const wheelPixelsPerHour = 100;
+const wheelLinesPerHour = 3;
 const syncInterval = 120_000;
 const currentClock = createCurrentClock();
+const clockSource = $('clock-source');
 const initialTime = currentClock.now();
 let state = createClockState(initialTime), slots = [], selectedInstant = null, hoverInstant = null;
 let visibleHours, displayedWindow, followingNow = true;
 let timelinePointer = null, suppressTimelineClick = false;
+let wheelOffset = 0;
 let searchItems = [], searchIndex = -1, toastTimer;
 let startupNotice = '';
 applyTranslations(document, locale);
@@ -30,14 +34,14 @@ function notify(message, error = false) {
   $('toast').hidden = false;
   toastTimer = setTimeout(() => { $('toast').hidden = true; }, error ? 7000 : 3500);
 }
-function on(id, event, handler) {
+function on(id, event, handler, options) {
   $(id).addEventListener(event, ev => {
     try { handler(ev); }
     catch (error) {
       console.error(error);
       notify(text.actionError, true);
     }
-  });
+  }, options);
 }
 function save() {
   try {
@@ -132,6 +136,11 @@ function updateLiveTime(now) {
   const clock = $('live-time');
   clock.textContent = formatTime(now, SEOUL_ZONE, state.format, locale, true);
   clock.dateTime = new Date(now).toISOString();
+  const source = currentClock.source();
+  if (source !== clockSource.dataset.source) {
+    clockSource.dataset.source = source;
+    $('clock-source-tooltip').textContent = source === 'server' ? text.clockServerSource : text.clockDeviceSource;
+  }
 
   const timeline = $('timeline');
   const currentSlot = slots.findIndex(slot => now >= slot.start && now < slot.end);
@@ -178,11 +187,11 @@ function updateComparison(now = currentClock.now()) {
     ? text.comparing(shortDate(instant, SEOUL_ZONE, locale), formatTime(instant, SEOUL_ZONE, state.format, locale))
     : text.comparisonHint;
 }
-function showWindowAt(instant, follow = false) {
+function showWindowAt(instant, follow = false, shift = 0) {
   followingNow = follow;
   selectedInstant = null;
   hoverInstant = null;
-  render(instant);
+  render(instant, shift);
 }
 function changeDate(date) {
   if (date === dateString(currentClock.now(), SEOUL_ZONE)) returnToNow();
@@ -252,6 +261,23 @@ function endTimelinePointer(event) {
   $('timeline').classList.remove('is-panning');
 }
 
+function scrollTimeline(event) {
+  if (event.ctrlKey || timelinePointer || !event.target.closest('.lane, .axis-hours')) return;
+  const { deltaMode, deltaX, deltaY } = event;
+  const delta = Math.abs(deltaX) > Math.abs(deltaY) ? deltaX : deltaY;
+  if (!delta) return;
+  event.preventDefault();
+
+  const unitsPerHour = deltaMode === WheelEvent.DOM_DELTA_LINE ? wheelLinesPerHour
+    : deltaMode === WheelEvent.DOM_DELTA_PAGE ? 1 : wheelPixelsPerHour;
+  if (Math.sign(wheelOffset) !== Math.sign(delta)) wheelOffset = 0;
+  wheelOffset += delta / unitsPerHour;
+  const shift = Math.max(-visibleHours, Math.min(visibleHours, Math.trunc(wheelOffset)));
+  // 트랙패드의 작은 움직임은 모아서 한 시간 칸씩 이동합니다.
+  wheelOffset %= 1;
+  if (shift) showWindowAt(displayedWindow.center.start, false, shift);
+}
+
 function showSearch() {
   searchItems = searchLocations($('city-search').value);
   searchIndex = -1;
@@ -317,6 +343,7 @@ on('date-picker', 'change', event => {
   changeDate(date);
 });
 on('time-format', 'change', event => commit(() => { state.format = event.target.value; }));
+on('timeline', 'wheel', scrollTimeline, { passive: false });
 on('timeline', 'pointerdown', beginTimelinePointer);
 window.addEventListener('pointermove', panTimeline, { passive: false, capture: true });
 window.addEventListener('pointerup', endTimelinePointer);
@@ -370,9 +397,16 @@ on('timeline', 'keydown', event => {
   lane.querySelectorAll('[data-cell]').forEach(button => { button.tabIndex = Number(button.dataset.cell) === next ? 0 : -1; });
   lane.querySelector(`[data-cell="${next}"]`).focus();
 });
+clockSource.addEventListener('mouseenter', () => clockSource.removeAttribute('data-dismissed'));
+clockSource.addEventListener('focusin', () => clockSource.removeAttribute('data-dismissed'));
 document.addEventListener('keydown', event => {
   if (event.key === '/' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) { event.preventDefault(); $('city-search').focus(); }
-  if (event.key === 'Escape') { closeSearch(); selectedInstant = null; hoverInstant = null; updateComparison(); }
+  if (event.key !== 'Escape') return;
+  if (clockSource.matches(':is(:hover, :focus-within):not([data-dismissed])')) {
+    clockSource.dataset.dismissed = '';
+    return;
+  }
+  closeSearch(); selectedInstant = null; hoverInstant = null; updateComparison();
 });
 function tick() {
   if (document.hidden) return;

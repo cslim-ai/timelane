@@ -15,7 +15,20 @@
   <header class="site-header">
     <a class="brand" href="./index.html" aria-label="TimeLane home" data-i18n-label="home"><img src="./assets/icon.svg" alt="" width="34" height="34"><strong>TimeLane</strong></a>
     <span class="header-label" data-i18n="worldClock">World Clock</span>
-    <div class="live-clock"><span class="status-dot" aria-hidden="true"></span><span data-i18n="seoulLive">Seoul local time</span><time id="live-time">--:--:--</time></div>
+    <div class="live-clock">
+      <span data-i18n="seoulLive">Seoul local time</span><time id="live-time">--:--:--</time>
+      <span id="clock-source" class="clock-source" data-source="device">
+        <span class="clock-source-icon" role="img" tabindex="0" aria-label="Time source" data-i18n-label="clockSource" aria-describedby="clock-source-tooltip">
+          <svg class="source-server" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <rect x="2.5" y="3" width="15" height="6" rx="1.5"/><rect x="2.5" y="11" width="15" height="6" rx="1.5"/><path d="M6 6h.5M6 14h.5" stroke-linecap="round"/>
+          </svg>
+          <svg class="source-device" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <rect x="2.5" y="3" width="15" height="10.5" rx="1.5"/><path d="M10 13.5V17m-3.5 0h7" stroke-linecap="round"/>
+          </svg>
+        </span>
+        <span id="clock-source-tooltip" class="clock-source-tooltip" role="tooltip" data-i18n="clockDeviceSource">Time from this device’s system clock.</span>
+      </span>
+    </div>
   </header>
   <main>
     <h1 class="sr-only" data-i18n="worldComparison">Compare world times</h1>
@@ -37,7 +50,7 @@
         <button id="current-time" class="button" type="button" aria-controls="timeline" aria-label="Return to current time" data-i18n="now" data-i18n-label="returnToNow">Now</button>
       </div>
       <div class="timeline-scroll" id="timeline-scroll"><div id="timeline" class="timeline" tabindex="-1" aria-label="Compare times by city" data-i18n-label="cityComparison"></div></div>
-      <div class="timeline-footer"><div class="legend"><span><i class="legend-day" aria-hidden="true"></i><span data-i18n="day">Day</span></span><span><i class="legend-evening" aria-hidden="true"></i><span data-i18n="evening">Evening</span></span><span><i class="legend-night" aria-hidden="true"></i><span data-i18n="night">Night</span></span></div><p id="comparison-status" data-i18n="comparisonHint">Click an hour to center it, or drag left or right to browse.</p></div>
+      <div class="timeline-footer"><div class="legend"><span><i class="legend-day" aria-hidden="true"></i><span data-i18n="day">Day</span></span><span><i class="legend-evening" aria-hidden="true"></i><span data-i18n="evening">Evening</span></span><span><i class="legend-night" aria-hidden="true"></i><span data-i18n="night">Night</span></span></div><p id="comparison-status" data-i18n="comparisonHint">Click an hour to center it. Drag or scroll over the timeline to browse.</p></div>
     </section>
     <p id="save-status" class="save-status" data-i18n="saved">Your cities are saved in this browser.</p>
   </main>

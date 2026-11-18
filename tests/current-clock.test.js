@@ -28,9 +28,11 @@ test('서버 응답 전에는 기기 시각을 쓰고, 동기화 후에는 네�
   const { clock, advance, device } = setup();
   const sync = clock.sync();
   assert.equal(clock.now(), device);
+  assert.equal(clock.source(), 'device');
   advance(200);
   await sync;
   assert.equal(clock.now(), serverNow + 100);
+  assert.equal(clock.source(), 'server');
   advance(1000, 60000);
   assert.equal(clock.now(), serverNow + 1100);
 });
@@ -41,6 +43,7 @@ test('연결이 끊기면 기기 시계로 전환하고 재연결하면 다시 �
   await env.clock.sync();
   assert.equal(env.clock.now(), serverNow);
   env.setOnline(false);
+  assert.equal(env.clock.source(), 'device');
   env.clock.useDeviceTime();
   await env.clock.sync();
   assert.equal(attempts, 1);
@@ -68,6 +71,7 @@ test('네트워크 오류, HTTP 오류 또는 잘못된 응답이면 이전 동�
     next = response;
     await env.clock.sync();
     assert.equal(env.clock.now(), env.device);
+    assert.equal(env.clock.source(), 'device');
   }
 });
 

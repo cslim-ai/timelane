@@ -37,7 +37,20 @@ input::placeholder { color: #b2c0c9; opacity: 1; }
 .header-label { font-size: 16px; color: var(--muted); padding-left: 20px; border-left: 1px solid #576671; }
 .live-clock { display: flex; align-items: center; gap: 10px; margin-left: auto; font-size: 14px; color: #ccd8e0; white-space: nowrap; }
 .live-clock time { color: #e7f5ee; font-size: 22px; font-weight: 650; font-variant-numeric: tabular-nums; line-height: 1.25; }
-.status-dot { width: 7px; height: 7px; border-radius: 50%; background: #9bc4b4; flex-shrink: 0; }
+.clock-source { position: relative; flex-shrink: 0; color: var(--muted); }
+.clock-source[data-source="server"] { color: var(--accent); }
+.clock-source-icon { display: grid; place-items: center; width: 26px; height: 30px; border-radius: 4px; }
+.clock-source-icon:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.clock-source-icon svg { width: 19px; height: 19px; }
+.clock-source[data-source="server"] .source-device, .clock-source[data-source="device"] .source-server { display: none; }
+.clock-source-tooltip {
+  visibility: hidden; position: absolute; top: 100%; right: 0; z-index: 20;
+  width: max-content; max-width: min(270px, calc(100vw - 24px));
+  padding: 8px 11px; border: 1px solid #718591; border-radius: 5px;
+  background: #2c3943; box-shadow: 0 8px 20px #10171f70;
+  color: #e6edf2; font-size: 14px; line-height: 1.5; white-space: normal;
+}
+.clock-source:not([data-dismissed]):is(:hover, :focus-within) .clock-source-tooltip { visibility: visible; }
 main { max-width: 1496px; margin: 0 auto; padding: 28px 28px 20px; }
 .workspace { border: 1px solid #52616d; border-radius: 7px; background: var(--surface); }
 .toolbar { display: flex; align-items: center; gap: 20px; padding: 19px 20px; border-bottom: 1px solid var(--line); }

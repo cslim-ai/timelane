@@ -392,6 +392,9 @@ const messages = {
     home: 'TimeLane home',
     worldClock: 'World Clock',
     seoulLive: 'Seoul local time',
+    clockSource: 'Time source',
+    clockDeviceSource: 'Time from this device’s system clock.',
+    clockServerSource: 'Synced with the UTCTime time server.',
     worldComparison: 'Compare world times',
     searchPlaceholder: 'Add a city or time zone',
     searchLabel: 'Search cities and time zones',
@@ -410,7 +413,7 @@ const messages = {
     evening: 'Evening',
     night: 'Night',
     cityLocalTime: 'City · Local time',
-    comparisonHint: 'Click an hour to center it, or drag left or right to browse.',
+    comparisonHint: 'Click an hour to center it. Drag or scroll over the timeline to browse.',
     saved: 'Your cities are saved in this browser.',
     storageUnavailable: 'Browser storage is unavailable. Changes last only in this tab.',
     loadError: 'Your cities could not be loaded. The default list is shown.',
@@ -433,6 +436,9 @@ const messages = {
     home: 'TimeLane 처음으로',
     worldClock: '세계 시계',
     seoulLive: '서울 현재 시각',
+    clockSource: '시각 출처',
+    clockDeviceSource: '이 기기의 시스템 시계에서 가져온 시각입니다.',
+    clockServerSource: 'UTCTime 시간 서버와 동기화한 시각입니다.',
     worldComparison: '세계 시간 비교',
     searchPlaceholder: '도시 또는 시간대 추가',
     searchLabel: '도시 또는 시간대 검색',
@@ -451,7 +457,7 @@ const messages = {
     evening: '저녁',
     night: '밤',
     cityLocalTime: '도시 · 현지 시각',
-    comparisonHint: '시간 칸을 클릭해 가운데에 놓거나, 좌우로 끌어 이동하세요.',
+    comparisonHint: '시간 칸을 클릭해 가운데에 놓으세요. 시간표는 드래그하거나 휠을 돌려 이동할 수 있습니다.',
     saved: '도시 목록은 이 브라우저에 저장됩니다.',
     storageUnavailable: '브라우저 저장소를 사용할 수 없어 변경 내용은 현재 탭에서만 유지됩니다.',
     loadError: '도시 목록을 읽을 수 없어 기본 화면을 열었습니다.',
@@ -501,8 +507,12 @@ function createCurrentClock({
   let sample = null;
   let request = null;
 
+  function source() {
+    return sample && isOnline() ? 'server' : 'device';
+  }
+
   function now() {
-    if (!sample || !isOnline()) return deviceNow();
+    if (source() === 'device') return deviceNow();
     return Math.round(sample.time + elapsedNow() - sample.receivedAt);
   }
 
@@ -548,7 +558,7 @@ function createCurrentClock({
     }
   }
 
-  return { now, sync, useDeviceTime };
+  return { now, source, sync, useDeviceTime };
 }
 return { createCurrentClock };
 })();
@@ -568,12 +578,16 @@ const text = messages[locale];
 const referenceDate = new Intl.DateTimeFormat(locale, { timeZone: SEOUL_ZONE, year: 'numeric', month: 'short', day: 'numeric', weekday: 'short' });
 const maxVisibleHours = 25;
 const dragThreshold = 8;
+const wheelPixelsPerHour = 100;
+const wheelLinesPerHour = 3;
 const syncInterval = 120_000;
 const currentClock = createCurrentClock();
+const clockSource = $('clock-source');
 const initialTime = currentClock.now();
 let state = createClockState(initialTime), slots = [], selectedInstant = null, hoverInstant = null;
 let visibleHours, displayedWindow, followingNow = true;
 let timelinePointer = null, suppressTimelineClick = false;
+let wheelOffset = 0;
 let searchItems = [], searchIndex = -1, toastTimer;
 let startupNotice = '';
 applyTranslations(document, locale);
@@ -587,14 +601,14 @@ function notify(message, error = false) {
   $('toast').hidden = false;
   toastTimer = setTimeout(() => { $('toast').hidden = true; }, error ? 7000 : 3500);
 }
-function on(id, event, handler) {
+function on(id, event, handler, options) {
   $(id).addEventListener(event, ev => {
     try { handler(ev); }
     catch (error) {
       console.error(error);
       notify(text.actionError, true);
     }
-  });
+  }, options);
 }
 function save() {
   try {
@@ -689,6 +703,11 @@ function updateLiveTime(now) {
   const clock = $('live-time');
   clock.textContent = formatTime(now, SEOUL_ZONE, state.format, locale, true);
   clock.dateTime = new Date(now).toISOString();
+  const source = currentClock.source();
+  if (source !== clockSource.dataset.source) {
+    clockSource.dataset.source = source;
+    $('clock-source-tooltip').textContent = source === 'server' ? text.clockServerSource : text.clockDeviceSource;
+  }
 
   const timeline = $('timeline');
   const currentSlot = slots.findIndex(slot => now >= slot.start && now < slot.end);
@@ -735,11 +754,11 @@ function updateComparison(now = currentClock.now()) {
     ? text.comparing(shortDate(instant, SEOUL_ZONE, locale), formatTime(instant, SEOUL_ZONE, state.format, locale))
     : text.comparisonHint;
 }
-function showWindowAt(instant, follow = false) {
+function showWindowAt(instant, follow = false, shift = 0) {
   followingNow = follow;
   selectedInstant = null;
   hoverInstant = null;
-  render(instant);
+  render(instant, shift);
 }
 function changeDate(date) {
   if (date === dateString(currentClock.now(), SEOUL_ZONE)) returnToNow();
@@ -809,6 +828,23 @@ function endTimelinePointer(event) {
   $('timeline').classList.remove('is-panning');
 }
 
+function scrollTimeline(event) {
+  if (event.ctrlKey || timelinePointer || !event.target.closest('.lane, .axis-hours')) return;
+  const { deltaMode, deltaX, deltaY } = event;
+  const delta = Math.abs(deltaX) > Math.abs(deltaY) ? deltaX : deltaY;
+  if (!delta) return;
+  event.preventDefault();
+
+  const unitsPerHour = deltaMode === WheelEvent.DOM_DELTA_LINE ? wheelLinesPerHour
+    : deltaMode === WheelEvent.DOM_DELTA_PAGE ? 1 : wheelPixelsPerHour;
+  if (Math.sign(wheelOffset) !== Math.sign(delta)) wheelOffset = 0;
+  wheelOffset += delta / unitsPerHour;
+  const shift = Math.max(-visibleHours, Math.min(visibleHours, Math.trunc(wheelOffset)));
+  // 트랙패드의 작은 움직임은 모아서 한 시간 칸씩 이동합니다.
+  wheelOffset %= 1;
+  if (shift) showWindowAt(displayedWindow.center.start, false, shift);
+}
+
 function showSearch() {
   searchItems = searchLocations($('city-search').value);
   searchIndex = -1;
@@ -874,6 +910,7 @@ on('date-picker', 'change', event => {
   changeDate(date);
 });
 on('time-format', 'change', event => commit(() => { state.format = event.target.value; }));
+on('timeline', 'wheel', scrollTimeline, { passive: false });
 on('timeline', 'pointerdown', beginTimelinePointer);
 window.addEventListener('pointermove', panTimeline, { passive: false, capture: true });
 window.addEventListener('pointerup', endTimelinePointer);
@@ -927,9 +964,16 @@ on('timeline', 'keydown', event => {
   lane.querySelectorAll('[data-cell]').forEach(button => { button.tabIndex = Number(button.dataset.cell) === next ? 0 : -1; });
   lane.querySelector(`[data-cell="${next}"]`).focus();
 });
+clockSource.addEventListener('mouseenter', () => clockSource.removeAttribute('data-dismissed'));
+clockSource.addEventListener('focusin', () => clockSource.removeAttribute('data-dismissed'));
 document.addEventListener('keydown', event => {
   if (event.key === '/' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) { event.preventDefault(); $('city-search').focus(); }
-  if (event.key === 'Escape') { closeSearch(); selectedInstant = null; hoverInstant = null; updateComparison(); }
+  if (event.key !== 'Escape') return;
+  if (clockSource.matches(':is(:hover, :focus-within):not([data-dismissed])')) {
+    clockSource.dataset.dismissed = '';
+    return;
+  }
+  closeSearch(); selectedInstant = null; hoverInstant = null; updateComparison();
 });
 function tick() {
   if (document.hidden) return;

@@ -12,8 +12,12 @@ export function createCurrentClock({
   let sample = null;
   let request = null;
 
+  function source() {
+    return sample && isOnline() ? 'server' : 'device';
+  }
+
   function now() {
-    if (!sample || !isOnline()) return deviceNow();
+    if (source() === 'device') return deviceNow();
     return Math.round(sample.time + elapsedNow() - sample.receivedAt);
   }
 
@@ -59,5 +63,5 @@ export function createCurrentClock({
     }
   }
 
-  return { now, sync, useDeviceTime };
+  return { now, source, sync, useDeviceTime };
 }
