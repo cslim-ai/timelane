@@ -119,14 +119,14 @@ export function utcOffset(instant, zone) {
 export function zoneAbbreviation(instant, zone) {
   return new Intl.DateTimeFormat('en-US', { timeZone: zone, timeZoneName: 'short' }).formatToParts(instant).find(p => p.type === 'timeZoneName').value;
 }
-export function formatTime(instant, zone, format = '24', locale = 'ko-KR', showSeconds = false) {
-  return new Intl.DateTimeFormat(format === 'mx' ? locale : format === '12' ? 'en-US' : 'en-GB', {
+export function formatTime(instant, zone, format = '24', locale = 'en-US', showSeconds = false) {
+  return new Intl.DateTimeFormat(format === '24' ? 'en-GB' : locale, {
     timeZone: zone, hour: '2-digit', minute: '2-digit', second: showSeconds ? '2-digit' : undefined,
-    ...(format === 'mx' ? {} : { hour12: format === '12' }), hourCycle: format === '24' ? 'h23' : undefined,
+    hourCycle: format === '24' ? 'h23' : format === '12' ? 'h12' : undefined,
   }).format(instant);
 }
-export function shortDate(instant, zone) {
-  return new Intl.DateTimeFormat('ko-KR', { timeZone: zone, month: 'numeric', day: 'numeric', weekday: 'short' }).format(instant);
+export function shortDate(instant, zone, locale = 'en-US') {
+  return new Intl.DateTimeFormat(locale, { timeZone: zone, month: 'numeric', day: 'numeric', weekday: 'short' }).format(instant);
 }
 export function isWorkingTime(instant, location) {
   const p = zonedParts(instant, location.zone);

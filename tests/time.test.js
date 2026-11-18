@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { zonedParts, wallToInstant, daySlots, offsetMinutes, nextTransition, addDays, isWorkingTime, formatTime } from '../src/time.js';
+import { zonedParts, wallToInstant, daySlots, offsetMinutes, nextTransition, addDays, isWorkingTime, formatTime, shortDate } from '../src/time.js';
 
 test('서울과 뉴욕의 같은 순간을 각 현지 날짜로 변환합니다', () => {
   const instant = Date.parse('2026-11-18T01:30:00Z');
@@ -11,8 +11,14 @@ test('서울과 뉴욕의 같은 순간을 각 현지 날짜로 변환합니다'
 test('실시간 시계는 초를 표시하고 12시간과 24시간 형식을 따릅니다', () => {
   const instant = Date.parse('2026-11-18T15:02:37Z');
   assert.equal(formatTime(instant, 'Asia/Seoul', '24', 'ko-KR', true), '00:02:37');
-  assert.equal(formatTime(instant, 'Asia/Seoul', '12', 'ko-KR', true), '12:02:37 AM');
+  assert.equal(formatTime(instant, 'Asia/Seoul', '12', 'en-US', true), '12:02:37 AM');
+  assert.equal(formatTime(instant, 'Asia/Seoul', '12', 'ko-KR', true), '오전 12:02:37');
   assert.equal(formatTime(instant, 'Asia/Seoul'), '00:02');
+});
+test('현지 날짜가 언어에 맞게 표시되고 기준 시각은 유지됩니다', () => {
+  const instant = Date.parse('2026-11-18T15:02:37Z');
+  assert.equal(shortDate(instant, 'Asia/Seoul', 'en-US'), 'Thu, 11/19');
+  assert.equal(shortDate(instant, 'Asia/Seoul', 'ko-KR'), '11. 19. (목)');
 });
 test('30분과 45분 시차를 보존합니다', () => {
   const t = Date.parse('2026-01-01T00:00Z');

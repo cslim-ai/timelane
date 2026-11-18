@@ -28,7 +28,7 @@ export function createBrowserBundle(sources) {
 }
 
 export async function buildProjectBundle() {
-  const names = ['time', 'locations', 'clock-state', 'app'];
+  const names = ['time', 'locations', 'clock-state', 'locale', 'current-clock', 'app'];
   const sources = await Promise.all(names.map(async name => ({ name, source: await readFile(new URL(`../src/${name}.js`, import.meta.url), 'utf8') })));
   return createBrowserBundle(sources);
 }

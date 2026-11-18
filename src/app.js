@@ -1,19 +1,27 @@
-import { HOUR, MINUTE, zonedParts, dateString, pad, wallToInstant, addDays, formatTime, shortDate, utcOffset, zoneAbbreviation } from './time.js';
-import { getLocation, searchLocations } from './locations.js';
+import { HOUR, MINUTE, zonedParts, dateString, pad, wallToInstant, parseDate, addDays, formatTime, shortDate, utcOffset, zoneAbbreviation } from './time.js';
+import { getLocation, searchLocations, displayLocation } from './locations.js';
 import { SEOUL_ZONE, MAX_CITIES, MIN_CLOCK_DATE, MAX_CLOCK_DATE, createClockState, validateClockState, loadClockState, saveClockState, reorderCities, clockWindow } from './clock-state.js';
+import { selectLocale, messages, applyTranslations } from './locale.js';
+import { createCurrentClock } from './current-clock.js';
 
 const $ = id => document.getElementById(id);
 const escape = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
-const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
+const locale = selectLocale(navigator.language || navigator.languages?.[0]);
+const text = messages[locale];
+const referenceDate = new Intl.DateTimeFormat(locale, { timeZone: SEOUL_ZONE, year: 'numeric', month: 'short', day: 'numeric', weekday: 'short' });
 const maxVisibleHours = 25;
 const dragThreshold = 8;
-let state = createClockState(), slots = [], selectedInstant = null, hoverInstant = null;
+const syncInterval = 120_000;
+const currentClock = createCurrentClock();
+const initialTime = currentClock.now();
+let state = createClockState(initialTime), slots = [], selectedInstant = null, hoverInstant = null;
 let visibleHours, displayedWindow, followingNow = true;
 let timelinePointer = null, suppressTimelineClick = false;
 let searchItems = [], searchIndex = -1, toastTimer;
 let startupNotice = '';
-try { state = loadClockState(localStorage); }
-catch { startupNotice = '도시 목록을 읽을 수 없어 기본 화면을 열었습니다. 기존 저장 데이터는 유지됩니다.'; }
+applyTranslations(document, locale);
+try { state = loadClockState(localStorage, initialTime); }
+catch { startupNotice = text.loadError; }
 
 function notify(message, error = false) {
   clearTimeout(toastTimer);
@@ -25,15 +33,18 @@ function notify(message, error = false) {
 function on(id, event, handler) {
   $(id).addEventListener(event, ev => {
     try { handler(ev); }
-    catch (error) { notify(error.message || '작업을 완료할 수 없습니다.', true); }
+    catch (error) {
+      console.error(error);
+      notify(text.actionError, true);
+    }
   });
 }
 function save() {
   try {
     saveClockState(localStorage, state);
-    $('save-status').textContent = '도시 목록은 이 브라우저에 저장됩니다.';
+    $('save-status').textContent = text.saved;
   } catch {
-    $('save-status').textContent = '브라우저 저장소를 사용할 수 없어 변경 내용은 현재 탭에서만 유지됩니다.';
+    $('save-status').textContent = text.storageUnavailable;
   }
 }
 function commit(change) {
@@ -41,7 +52,7 @@ function commit(change) {
   try { change(); state = validateClockState(state); render(); save(); }
   catch (error) { state = previous; render(); throw error; }
 }
-function places() { return state.locations.map(getLocation); }
+function localizedCity(id) { return displayLocation(getLocation(id), locale); }
 function percent(instant) {
   const start = slots[0].start - displayedWindow.emptyBefore * HOUR;
   const end = slots.at(-1).end + displayedWindow.emptyAfter * HOUR;
@@ -56,13 +67,12 @@ function measureVisibleHours() {
   // 가운데 한 칸의 양쪽에 같은 수의 시간 칸을 배치합니다.
   return Math.max(3, hours % 2 === 0 ? hours - 1 : hours);
 }
-function render(instant = displayedWindow?.center.start ?? Date.now(), shift = 0) {
+function render(instant = displayedWindow?.center.start ?? currentClock.now(), shift = 0) {
   visibleHours = measureVisibleHours();
   displayedWindow = clockWindow(instant, visibleHours, shift);
   slots = displayedWindow.slots;
   state.date = displayedWindow.date;
-  const date = zonedParts(displayedWindow.center.start, SEOUL_ZONE);
-  $('date-label').textContent = `${date.year}. ${pad(date.month)}. ${pad(date.day)}. (${weekdays[date.weekday]})`;
+  $('date-label').textContent = referenceDate.format(displayedWindow.center.start);
   $('date-picker').value = state.date;
   $('time-format').value = state.format;
   $('reference-offset').textContent = utcOffset(displayedWindow.center.start, SEOUL_ZONE);
@@ -71,14 +81,14 @@ function render(instant = displayedWindow?.center.start ?? Date.now(), shift = 0
   renderTimeline();
   const scroller = $('timeline-scroll');
   scroller.scrollLeft = (scroller.scrollWidth - scroller.clientWidth) / 2;
-  const now = Date.now();
+  const now = currentClock.now();
   updateLiveTime(now);
   updateComparison(now);
 }
 function hourLabel(instant, place) {
   const p = zonedParts(instant, place.zone);
   const hour = state.format === '12' ? p.hour % 12 || 12 : pad(p.hour);
-  return `<span class="hour-number">${hour}${p.minute ? `<span class="minute">:${pad(p.minute)}</span>` : ''}</span>${state.format === '12' ? `<span class="period">${p.hour < 12 ? 'am' : 'pm'}</span>` : ''}`;
+  return `<span class="hour-number">${hour}${p.minute ? `<span class="minute">:${pad(p.minute)}</span>` : ''}</span>${state.format === '12' ? `<span class="period">${p.hour < 12 ? text.morning : text.afternoon}</span>` : ''}`;
 }
 function renderTimeline() {
   const timeline = $('timeline');
@@ -89,17 +99,18 @@ function renderTimeline() {
   const emptyTrack = 'minmax(0, 60fr) ';
   timeline.style.setProperty('--columns', visibleHours);
   timeline.style.setProperty('--slot-tracks', `${emptyTrack.repeat(emptyBefore)}${tracks} ${emptyTrack.repeat(emptyAfter)}`);
-  timeline.innerHTML = `<div class="axis-row"><div class="axis-label">도시 · 현지 시각</div><div class="axis-hours">${before}${slots.map((slot, index) => {
+  timeline.innerHTML = `<div class="axis-row"><div class="axis-label">${escape(text.cityLocalTime)}</div><div class="axis-hours">${before}${slots.map((slot, index) => {
     const p = zonedParts(slot.start, SEOUL_ZONE);
     const hour = state.format === '12' ? p.hour % 12 || 12 : pad(p.hour);
     return `<span data-axis-cell="${index}">${hour}</span>`;
-  }).join('')}${after}</div></div>` + places().map((place, rowIndex) => {
+  }).join('')}${after}</div></div>` + state.locations.map((id, rowIndex) => {
+    const place = localizedCity(id);
     const fixed = place.id === 'seoul';
     const name = escape(place.name);
     const controls = fixed ? '' : `<div class="row-controls">
-      <button type="button" data-action="up" aria-label="${name} 위로"${rowIndex === 1 ? ' disabled' : ''}>↑</button>
-      <button type="button" data-action="down" aria-label="${name} 아래로"${rowIndex === state.locations.length - 1 ? ' disabled' : ''}>↓</button>
-      <button type="button" class="remove-city" data-action="remove" title="도시 삭제" aria-label="${name} 삭제">×</button>
+      <button type="button" data-action="up" aria-label="${escape(text.moveUp(place.name))}"${rowIndex === 1 ? ' disabled' : ''}>↑</button>
+      <button type="button" data-action="down" aria-label="${escape(text.moveDown(place.name))}"${rowIndex === state.locations.length - 1 ? ' disabled' : ''}>↓</button>
+      <button type="button" class="remove-city" data-action="remove" title="${escape(text.removeCity(place.name))}" aria-label="${escape(text.removeCity(place.name))}">×</button>
     </div>`;
     return `<div class="city-row${fixed ? ' seoul-row' : ''}" data-id="${escape(place.id)}">
       <div class="city-info">
@@ -107,11 +118,11 @@ function renderTimeline() {
         <div class="city-reading"><time class="city-clock"></time><p class="city-date"></p></div>
         ${controls}
       </div>
-      <div class="lane" data-row="${rowIndex}" aria-label="${name} 시간표">${before}${slots.map((slot, index) => {
+      <div class="lane" data-row="${rowIndex}" aria-label="${escape(text.timelineFor(place.name))}">${before}${slots.map((slot, index) => {
       const p = zonedParts(slot.start, place.zone);
       const phase = p.hour < 7 || p.hour >= 22 ? 'night' : p.hour >= 18 ? 'evening' : 'day';
       const dateChanged = index === 0 || dateString(slot.start, place.zone) !== dateString(slots[index - 1].start, place.zone);
-      const label = `${place.name} ${shortDate(slot.start, place.zone)} ${formatTime(slot.start, place.zone, state.format)} ${utcOffset(slot.start, place.zone)}`;
+      const label = `${place.name} ${shortDate(slot.start, place.zone, locale)} ${formatTime(slot.start, place.zone, state.format, locale)} ${utcOffset(slot.start, place.zone)}`;
       const tabIndex = slot.start === displayedWindow.center.start ? 0 : -1;
       return `<button type="button" class="time-cell ${phase}${dateChanged && index ? ' date-boundary' : ''}" data-cell="${index}" tabindex="${tabIndex}" aria-label="${escape(label)}" aria-pressed="false" title="${escape(label)}">${dateChanged ? `<span class="day-marker">${p.month}/${p.day}</span>` : ''}${hourLabel(slot.start, place)}</button>`;
     }).join('')}${after}<div class="comparison-band" hidden></div><div class="now-line" aria-hidden="true" hidden></div></div></div>`;
@@ -119,7 +130,7 @@ function renderTimeline() {
 }
 function updateLiveTime(now) {
   const clock = $('live-time');
-  clock.textContent = formatTime(now, SEOUL_ZONE, state.format, 'ko-KR', true);
+  clock.textContent = formatTime(now, SEOUL_ZONE, state.format, locale, true);
   clock.dateTime = new Date(now).toISOString();
 
   const timeline = $('timeline');
@@ -138,15 +149,15 @@ function updateLiveTime(now) {
     if (!line.hidden) line.style.left = `${position}%`;
   }
 }
-function updateComparison(now = Date.now()) {
+function updateComparison(now = currentClock.now()) {
   const instant = hoverInstant ?? selectedInstant ?? now;
   const fixed = selectedInstant !== null;
   const comparing = hoverInstant !== null || fixed;
   // 행 교체 중 발생하는 focusout에서도 기존 DOM 행의 도시를 정확히 갱신합니다.
   document.querySelectorAll('.city-row').forEach(row => {
-    const place = getLocation(row.dataset.id);
-    row.querySelector('.city-clock').textContent = formatTime(instant, place.zone, state.format);
-    row.querySelector('.city-date').textContent = shortDate(instant, place.zone);
+    const place = localizedCity(row.dataset.id);
+    row.querySelector('.city-clock').textContent = formatTime(instant, place.zone, state.format, locale);
+    row.querySelector('.city-date').textContent = shortDate(instant, place.zone, locale);
     const abbreviation = zoneAbbreviation(instant, place.zone);
     row.querySelector('.zone-abbreviation').textContent = ` · ${abbreviation}`;
     row.querySelector('.city-zone').title = `${place.country} · ${abbreviation} (${place.zone})`;
@@ -163,7 +174,9 @@ function updateComparison(now = Date.now()) {
     const selected = selectedInstant === slots[Number(cell.dataset.cell)]?.start;
     if (cell.getAttribute('aria-pressed') !== String(selected)) cell.setAttribute('aria-pressed', String(selected));
   });
-  $('comparison-status').textContent = comparing ? `서울 ${shortDate(instant, SEOUL_ZONE)} ${formatTime(instant, SEOUL_ZONE, state.format)} 비교 중` : '시간 칸을 클릭해 가운데에 놓거나, 좌우로 끌어 이동하세요.';
+  $('comparison-status').textContent = comparing
+    ? text.comparing(shortDate(instant, SEOUL_ZONE, locale), formatTime(instant, SEOUL_ZONE, state.format, locale))
+    : text.comparisonHint;
 }
 function showWindowAt(instant, follow = false) {
   followingNow = follow;
@@ -172,10 +185,10 @@ function showWindowAt(instant, follow = false) {
   render(instant);
 }
 function changeDate(date) {
-  if (date === dateString(Date.now(), SEOUL_ZONE)) returnToNow();
+  if (date === dateString(currentClock.now(), SEOUL_ZONE)) returnToNow();
   else showWindowAt(wallToInstant(date, '12:00', SEOUL_ZONE));
 }
-function returnToNow() { showWindowAt(Date.now(), true); }
+function returnToNow() { showWindowAt(currentClock.now(), true); }
 
 function selectTime(cell) {
   const instant = slots[Number(cell.dataset.cell)].start;
@@ -242,10 +255,11 @@ function endTimelinePointer(event) {
 function showSearch() {
   searchItems = searchLocations($('city-search').value);
   searchIndex = -1;
-  $('search-results').innerHTML = searchItems.length ? searchItems.map((place, index) => {
+  $('search-results').innerHTML = searchItems.length ? searchItems.map((result, index) => {
+    const place = displayLocation(result, locale);
     const added = state.locations.includes(place.id);
     return `<button type="button" class="search-option" role="option" aria-selected="false" id="search-option-${index}" data-search-index="${index}"${added ? ' disabled' : ''}><span><strong>${escape(place.name)}</strong><small>${escape(place.country)} · ${escape(place.zone)}</small></span><span class="add-symbol" aria-hidden="true">${added ? '✓' : '+'}</span></button>`;
-  }).join('') : '<p class="search-empty">검색 결과가 없습니다. 영문 도시나 시간대로도 검색해 보세요.</p>';
+  }).join('') : `<p class="search-empty">${escape(text.noResults)}</p>`;
   $('search-results').hidden = false;
   $('city-search').setAttribute('aria-expanded', 'true');
   $('city-search').removeAttribute('aria-activedescendant');
@@ -258,7 +272,10 @@ function closeSearch() {
 function addCity(index) {
   const place = searchItems[index];
   if (!place || state.locations.includes(place.id)) return;
-  if (state.locations.length >= MAX_CITIES) throw new Error(`도시는 서울을 포함해 최대 ${MAX_CITIES}개까지 추가할 수 있습니다.`);
+  if (state.locations.length >= MAX_CITIES) {
+    notify(text.cityLimit(MAX_CITIES), true);
+    return;
+  }
   commit(() => state.locations.push(place.id));
   $('city-search').value = '';
   $('city-search').focus(); closeSearch();
@@ -290,8 +307,14 @@ on('previous-day', 'click', () => changeDate(addDays(state.date, -1)));
 on('next-day', 'click', () => changeDate(addDays(state.date, 1)));
 on('current-time', 'click', returnToNow);
 on('date-picker', 'change', event => {
-  try { changeDate(event.target.value); }
-  catch (error) { event.target.value = state.date; throw error; }
+  const date = event.target.value;
+  try { parseDate(date); }
+  catch {
+    event.target.value = state.date;
+    notify(text.invalidDate, true);
+    return;
+  }
+  changeDate(date);
 });
 on('time-format', 'change', event => commit(() => { state.format = event.target.value; }));
 on('timeline', 'pointerdown', beginTimelinePointer);
@@ -353,7 +376,7 @@ document.addEventListener('keydown', event => {
 });
 function tick() {
   if (document.hidden) return;
-  const now = Date.now();
+  const now = currentClock.now();
   const { start, end } = displayedWindow.center;
   if (followingNow && !timelinePointer && selectedInstant === null && hoverInstant === null && (now < start || now >= end)) {
     render(now);
@@ -362,14 +385,34 @@ function tick() {
   updateLiveTime(now);
   updateComparison(now);
 }
-document.addEventListener('visibilitychange', tick);
+async function refreshClock() {
+  if (document.hidden) return;
+  await currentClock.sync();
+  tick();
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) return;
+  tick();
+  refreshClock();
+});
+window.addEventListener('offline', () => {
+  currentClock.useDeviceTime();
+  tick();
+});
+window.addEventListener('online', refreshClock);
+window.addEventListener('pageshow', event => { if (event.persisted) refreshClock(); });
 const clock = setInterval(tick, 1000);
+const clockSync = setInterval(refreshClock, syncInterval);
 render();
+refreshClock();
 const timelineResize = new ResizeObserver(() => { if (measureVisibleHours() !== visibleHours) render(); });
 timelineResize.observe($('timeline-scroll'));
 window.addEventListener('pagehide', event => {
+  currentClock.useDeviceTime();
   if (event.persisted) return;
   clearInterval(clock);
+  clearInterval(clockSync);
   timelineResize.disconnect();
 });
 if (startupNotice) { $('save-status').textContent = startupNotice; notify(startupNotice, true); }

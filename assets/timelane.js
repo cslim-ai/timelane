@@ -125,14 +125,14 @@ function utcOffset(instant, zone) {
 function zoneAbbreviation(instant, zone) {
   return new Intl.DateTimeFormat('en-US', { timeZone: zone, timeZoneName: 'short' }).formatToParts(instant).find(p => p.type === 'timeZoneName').value;
 }
-function formatTime(instant, zone, format = '24', locale = 'ko-KR', showSeconds = false) {
-  return new Intl.DateTimeFormat(format === 'mx' ? locale : format === '12' ? 'en-US' : 'en-GB', {
+function formatTime(instant, zone, format = '24', locale = 'en-US', showSeconds = false) {
+  return new Intl.DateTimeFormat(format === '24' ? 'en-GB' : locale, {
     timeZone: zone, hour: '2-digit', minute: '2-digit', second: showSeconds ? '2-digit' : undefined,
-    ...(format === 'mx' ? {} : { hour12: format === '12' }), hourCycle: format === '24' ? 'h23' : undefined,
+    hourCycle: format === '24' ? 'h23' : format === '12' ? 'h12' : undefined,
   }).format(instant);
 }
-function shortDate(instant, zone) {
-  return new Intl.DateTimeFormat('ko-KR', { timeZone: zone, month: 'numeric', day: 'numeric', weekday: 'short' }).format(instant);
+function shortDate(instant, zone, locale = 'en-US') {
+  return new Intl.DateTimeFormat(locale, { timeZone: zone, month: 'numeric', day: 'numeric', weekday: 'short' }).format(instant);
 }
 function isWorkingTime(instant, location) {
   const p = zonedParts(instant, location.zone);
@@ -150,123 +150,138 @@ return { MINUTE, HOUR, isTimeZone, zonedParts, dateString, pad, offsetMinutes, p
 // locations.js
 modules["locations"] = (() => {
 // 검색어/국가 메타데이터를 주요 도시에 제공하고 나머지 IANA 지역도 검색합니다.
-const rows = `seoul|서울|대한민국|Asia/Seoul|ko-KR|Seoul Korea KST 서울 인천 부산
-tokyo|도쿄|일본|Asia/Tokyo|ja-JP|Tokyo Japan JST 동경
-osaka|오사카|일본|Asia/Tokyo|ja-JP|Osaka
-new-york|뉴욕|미국|America/New_York|en-US|New York NYC USA EST EDT
-los-angeles|로스앤젤레스|미국|America/Los_Angeles|en-US|Los Angeles LA California PST PDT
-san-francisco|샌프란시스코|미국|America/Los_Angeles|en-US|San Francisco SF 실리콘밸리
-london|런던|영국|Europe/London|en-GB|London UK England GMT BST
-paris|파리|프랑스|Europe/Paris|fr-FR|Paris France CET CEST
-berlin|베를린|독일|Europe/Berlin|de-DE|Berlin Germany
-sydney|시드니|호주|Australia/Sydney|en-AU|Sydney Australia AEST AEDT
-melbourne|멜버른|호주|Australia/Melbourne|en-AU|Melbourne
-brisbane|브리즈번|호주|Australia/Brisbane|en-AU|Brisbane
-perth|퍼스|호주|Australia/Perth|en-AU|Perth
-adelaide|애들레이드|호주|Australia/Adelaide|en-AU|Adelaide
-auckland|오클랜드|뉴질랜드|Pacific/Auckland|en-NZ|Auckland New Zealand
-wellington|웰링턴|뉴질랜드|Pacific/Auckland|en-NZ|Wellington
-singapore|싱가포르|싱가포르|Asia/Singapore|en-SG|Singapore SGT
-hong-kong|홍콩|중국|Asia/Hong_Kong|zh-HK|Hong Kong HKT
-shanghai|상하이|중국|Asia/Shanghai|zh-CN|Shanghai China CST
-beijing|베이징|중국|Asia/Shanghai|zh-CN|Beijing 북경
-taipei|타이베이|대만|Asia/Taipei|zh-TW|Taipei Taiwan
-bangkok|방콕|태국|Asia/Bangkok|th-TH|Bangkok Thailand
-hanoi|하노이|베트남|Asia/Bangkok|vi-VN|Hanoi Vietnam
-ho-chi-minh|호찌민|베트남|Asia/Saigon|vi-VN|Ho Chi Minh Saigon 호치민
-manila|마닐라|필리핀|Asia/Manila|en-PH|Manila Philippines
-jakarta|자카르타|인도네시아|Asia/Jakarta|id-ID|Jakarta Indonesia
-bali|발리|인도네시아|Asia/Makassar|id-ID|Bali Denpasar
-kuala-lumpur|쿠알라룸푸르|말레이시아|Asia/Kuala_Lumpur|ms-MY|Kuala Lumpur Malaysia
-kolkata|콜카타|인도|Asia/Calcutta|en-IN|Kolkata Calcutta India IST
-mumbai|뭄바이|인도|Asia/Calcutta|en-IN|Mumbai Bombay
-delhi|뉴델리|인도|Asia/Calcutta|en-IN|New Delhi
-bengaluru|벵갈루루|인도|Asia/Calcutta|en-IN|Bengaluru Bangalore 방갈로르
-kathmandu|카트만두|네팔|Asia/Katmandu|ne-NP|Kathmandu Nepal
-dhaka|다카|방글라데시|Asia/Dhaka|bn-BD|Dhaka Bangladesh
-karachi|카라치|파키스탄|Asia/Karachi|en-PK|Karachi Pakistan
-colombo|콜롬보|스리랑카|Asia/Colombo|en-LK|Colombo Sri Lanka
-dubai|두바이|아랍에미리트|Asia/Dubai|en-AE|Dubai UAE
-riyadh|리야드|사우디아라비아|Asia/Riyadh|ar-SA|Riyadh Saudi Arabia
-doha|도하|카타르|Asia/Qatar|ar-QA|Doha Qatar
-tehran|테헤란|이란|Asia/Tehran|fa-IR|Tehran Iran
-jerusalem|예루살렘|이스라엘|Asia/Jerusalem|he-IL|Jerusalem Israel Tel Aviv 텔아비브
-istanbul|이스탄불|튀르키예|Europe/Istanbul|tr-TR|Istanbul Turkey
-moscow|모스크바|러시아|Europe/Moscow|ru-RU|Moscow Russia MSK
-vladivostok|블라디보스토크|러시아|Asia/Vladivostok|ru-RU|Vladivostok
-madrid|마드리드|스페인|Europe/Madrid|es-ES|Madrid Spain
-rome|로마|이탈리아|Europe/Rome|it-IT|Rome Italy
-amsterdam|암스테르담|네덜란드|Europe/Amsterdam|nl-NL|Amsterdam Netherlands
-zurich|취리히|스위스|Europe/Zurich|de-CH|Zurich Switzerland
-stockholm|스톡홀름|스웨덴|Europe/Stockholm|sv-SE|Stockholm Sweden
-oslo|오슬로|노르웨이|Europe/Oslo|nb-NO|Oslo Norway
-copenhagen|코펜하겐|덴마크|Europe/Copenhagen|da-DK|Copenhagen Denmark
-helsinki|헬싱키|핀란드|Europe/Helsinki|fi-FI|Helsinki Finland
-warsaw|바르샤바|폴란드|Europe/Warsaw|pl-PL|Warsaw Poland
-prague|프라하|체코|Europe/Prague|cs-CZ|Prague Czech
-vienna|빈|오스트리아|Europe/Vienna|de-AT|Vienna Austria 비엔나
-lisbon|리스본|포르투갈|Europe/Lisbon|pt-PT|Lisbon Portugal
-dublin|더블린|아일랜드|Europe/Dublin|en-IE|Dublin Ireland
-athens|아테네|그리스|Europe/Athens|el-GR|Athens Greece
-kyiv|키이우|우크라이나|Europe/Kiev|uk-UA|Kyiv Kiev Ukraine 키예프
-bucharest|부쿠레슈티|루마니아|Europe/Bucharest|ro-RO|Bucharest Romania
-cairo|카이로|이집트|Africa/Cairo|ar-EG|Cairo Egypt
-johannesburg|요하네스버그|남아프리카공화국|Africa/Johannesburg|en-ZA|Johannesburg South Africa
-cape-town|케이프타운|남아프리카공화국|Africa/Johannesburg|en-ZA|Cape Town
-nairobi|나이로비|케냐|Africa/Nairobi|sw-KE|Nairobi Kenya
-lagos|라고스|나이지리아|Africa/Lagos|en-NG|Lagos Nigeria
-accra|아크라|가나|Africa/Accra|en-GH|Accra Ghana
-casablanca|카사블랑카|모로코|Africa/Casablanca|ar-MA|Casablanca Morocco
-chicago|시카고|미국|America/Chicago|en-US|Chicago CST CDT
-denver|덴버|미국|America/Denver|en-US|Denver MST MDT
-phoenix|피닉스|미국|America/Phoenix|en-US|Phoenix Arizona
-seattle|시애틀|미국|America/Los_Angeles|en-US|Seattle Washington
-boston|보스턴|미국|America/New_York|en-US|Boston
-washington|워싱턴|미국|America/New_York|en-US|Washington DC
-miami|마이애미|미국|America/New_York|en-US|Miami Florida
-honolulu|호놀룰루|미국|Pacific/Honolulu|en-US|Honolulu Hawaii 하와이
-anchorage|앵커리지|미국|America/Anchorage|en-US|Anchorage Alaska
-toronto|토론토|캐나다|America/Toronto|en-CA|Toronto Canada
-vancouver|밴쿠버|캐나다|America/Vancouver|en-CA|Vancouver
-montreal|몬트리올|캐나다|America/Toronto|fr-CA|Montreal
-mexico-city|멕시코시티|멕시코|America/Mexico_City|es-MX|Mexico City
-bogota|보고타|콜롬비아|America/Bogota|es-CO|Bogota Colombia
-lima|리마|페루|America/Lima|es-PE|Lima Peru
-sao-paulo|상파울루|브라질|America/Sao_Paulo|pt-BR|Sao Paulo Brazil
-buenos-aires|부에노스아이레스|아르헨티나|America/Buenos_Aires|es-AR|Buenos Aires Argentina
-santiago|산티아고|칠레|America/Santiago|es-CL|Santiago Chile
-reykjavik|레이캬비크|아이슬란드|Atlantic/Reykjavik|is-IS|Reykjavik Iceland
-utc|UTC|협정 세계시|UTC|en-GB|UTC GMT Zulu 협정 세계시`;
+const rows = `seoul|서울|Seoul|대한민국|Asia/Seoul|ko-KR|Seoul Korea KST 서울 인천 부산
+tokyo|도쿄|Tokyo|일본|Asia/Tokyo|ja-JP|Tokyo Japan JST 동경
+osaka|오사카|Osaka|일본|Asia/Tokyo|ja-JP|Osaka
+new-york|뉴욕|New York|미국|America/New_York|en-US|New York NYC USA EST EDT
+los-angeles|로스앤젤레스|Los Angeles|미국|America/Los_Angeles|en-US|Los Angeles LA California PST PDT
+san-francisco|샌프란시스코|San Francisco|미국|America/Los_Angeles|en-US|San Francisco SF 실리콘밸리
+london|런던|London|영국|Europe/London|en-GB|London UK England GMT BST
+paris|파리|Paris|프랑스|Europe/Paris|fr-FR|Paris France CET CEST
+berlin|베를린|Berlin|독일|Europe/Berlin|de-DE|Berlin Germany
+sydney|시드니|Sydney|호주|Australia/Sydney|en-AU|Sydney Australia AEST AEDT
+melbourne|멜버른|Melbourne|호주|Australia/Melbourne|en-AU|Melbourne
+brisbane|브리즈번|Brisbane|호주|Australia/Brisbane|en-AU|Brisbane
+perth|퍼스|Perth|호주|Australia/Perth|en-AU|Perth
+adelaide|애들레이드|Adelaide|호주|Australia/Adelaide|en-AU|Adelaide
+auckland|오클랜드|Auckland|뉴질랜드|Pacific/Auckland|en-NZ|Auckland New Zealand
+wellington|웰링턴|Wellington|뉴질랜드|Pacific/Auckland|en-NZ|Wellington
+singapore|싱가포르|Singapore|싱가포르|Asia/Singapore|en-SG|Singapore SGT
+hong-kong|홍콩|Hong Kong|중국|Asia/Hong_Kong|zh-HK|Hong Kong HKT
+shanghai|상하이|Shanghai|중국|Asia/Shanghai|zh-CN|Shanghai China CST
+beijing|베이징|Beijing|중국|Asia/Shanghai|zh-CN|Beijing 북경
+taipei|타이베이|Taipei|대만|Asia/Taipei|zh-TW|Taipei Taiwan
+bangkok|방콕|Bangkok|태국|Asia/Bangkok|th-TH|Bangkok Thailand
+hanoi|하노이|Hanoi|베트남|Asia/Bangkok|vi-VN|Hanoi Vietnam
+ho-chi-minh|호찌민|Ho Chi Minh City|베트남|Asia/Saigon|vi-VN|Ho Chi Minh Saigon 호치민
+manila|마닐라|Manila|필리핀|Asia/Manila|en-PH|Manila Philippines
+jakarta|자카르타|Jakarta|인도네시아|Asia/Jakarta|id-ID|Jakarta Indonesia
+bali|발리|Bali|인도네시아|Asia/Makassar|id-ID|Bali Denpasar
+kuala-lumpur|쿠알라룸푸르|Kuala Lumpur|말레이시아|Asia/Kuala_Lumpur|ms-MY|Kuala Lumpur Malaysia
+kolkata|콜카타|Kolkata|인도|Asia/Calcutta|en-IN|Kolkata Calcutta India IST
+mumbai|뭄바이|Mumbai|인도|Asia/Calcutta|en-IN|Mumbai Bombay
+delhi|뉴델리|New Delhi|인도|Asia/Calcutta|en-IN|New Delhi
+bengaluru|벵갈루루|Bengaluru|인도|Asia/Calcutta|en-IN|Bengaluru Bangalore 방갈로르
+kathmandu|카트만두|Kathmandu|네팔|Asia/Katmandu|ne-NP|Kathmandu Nepal
+dhaka|다카|Dhaka|방글라데시|Asia/Dhaka|bn-BD|Dhaka Bangladesh
+karachi|카라치|Karachi|파키스탄|Asia/Karachi|en-PK|Karachi Pakistan
+colombo|콜롬보|Colombo|스리랑카|Asia/Colombo|en-LK|Colombo Sri Lanka
+dubai|두바이|Dubai|아랍에미리트|Asia/Dubai|en-AE|Dubai UAE
+riyadh|리야드|Riyadh|사우디아라비아|Asia/Riyadh|ar-SA|Riyadh Saudi Arabia
+doha|도하|Doha|카타르|Asia/Qatar|ar-QA|Doha Qatar
+tehran|테헤란|Tehran|이란|Asia/Tehran|fa-IR|Tehran Iran
+jerusalem|예루살렘|Jerusalem|이스라엘|Asia/Jerusalem|he-IL|Jerusalem Israel Tel Aviv 텔아비브
+istanbul|이스탄불|Istanbul|튀르키예|Europe/Istanbul|tr-TR|Istanbul Turkey
+moscow|모스크바|Moscow|러시아|Europe/Moscow|ru-RU|Moscow Russia MSK
+vladivostok|블라디보스토크|Vladivostok|러시아|Asia/Vladivostok|ru-RU|Vladivostok
+madrid|마드리드|Madrid|스페인|Europe/Madrid|es-ES|Madrid Spain
+rome|로마|Rome|이탈리아|Europe/Rome|it-IT|Rome Italy
+amsterdam|암스테르담|Amsterdam|네덜란드|Europe/Amsterdam|nl-NL|Amsterdam Netherlands
+zurich|취리히|Zürich|스위스|Europe/Zurich|de-CH|Zurich Switzerland
+stockholm|스톡홀름|Stockholm|스웨덴|Europe/Stockholm|sv-SE|Stockholm Sweden
+oslo|오슬로|Oslo|노르웨이|Europe/Oslo|nb-NO|Oslo Norway
+copenhagen|코펜하겐|Copenhagen|덴마크|Europe/Copenhagen|da-DK|Copenhagen Denmark
+helsinki|헬싱키|Helsinki|핀란드|Europe/Helsinki|fi-FI|Helsinki Finland
+warsaw|바르샤바|Warsaw|폴란드|Europe/Warsaw|pl-PL|Warsaw Poland
+prague|프라하|Prague|체코|Europe/Prague|cs-CZ|Prague Czech
+vienna|빈|Vienna|오스트리아|Europe/Vienna|de-AT|Vienna Austria 비엔나
+lisbon|리스본|Lisbon|포르투갈|Europe/Lisbon|pt-PT|Lisbon Portugal
+dublin|더블린|Dublin|아일랜드|Europe/Dublin|en-IE|Dublin Ireland
+athens|아테네|Athens|그리스|Europe/Athens|el-GR|Athens Greece
+kyiv|키이우|Kyiv|우크라이나|Europe/Kiev|uk-UA|Kyiv Kiev Ukraine 키예프
+bucharest|부쿠레슈티|Bucharest|루마니아|Europe/Bucharest|ro-RO|Bucharest Romania
+cairo|카이로|Cairo|이집트|Africa/Cairo|ar-EG|Cairo Egypt
+johannesburg|요하네스버그|Johannesburg|남아프리카공화국|Africa/Johannesburg|en-ZA|Johannesburg South Africa
+cape-town|케이프타운|Cape Town|남아프리카공화국|Africa/Johannesburg|en-ZA|Cape Town
+nairobi|나이로비|Nairobi|케냐|Africa/Nairobi|sw-KE|Nairobi Kenya
+lagos|라고스|Lagos|나이지리아|Africa/Lagos|en-NG|Lagos Nigeria
+accra|아크라|Accra|가나|Africa/Accra|en-GH|Accra Ghana
+casablanca|카사블랑카|Casablanca|모로코|Africa/Casablanca|ar-MA|Casablanca Morocco
+chicago|시카고|Chicago|미국|America/Chicago|en-US|Chicago CST CDT
+denver|덴버|Denver|미국|America/Denver|en-US|Denver MST MDT
+phoenix|피닉스|Phoenix|미국|America/Phoenix|en-US|Phoenix Arizona
+seattle|시애틀|Seattle|미국|America/Los_Angeles|en-US|Seattle Washington
+boston|보스턴|Boston|미국|America/New_York|en-US|Boston
+washington|워싱턴|Washington, DC|미국|America/New_York|en-US|Washington DC
+miami|마이애미|Miami|미국|America/New_York|en-US|Miami Florida
+honolulu|호놀룰루|Honolulu|미국|Pacific/Honolulu|en-US|Honolulu Hawaii 하와이
+anchorage|앵커리지|Anchorage|미국|America/Anchorage|en-US|Anchorage Alaska
+toronto|토론토|Toronto|캐나다|America/Toronto|en-CA|Toronto Canada
+vancouver|밴쿠버|Vancouver|캐나다|America/Vancouver|en-CA|Vancouver
+montreal|몬트리올|Montréal|캐나다|America/Toronto|fr-CA|Montreal
+mexico-city|멕시코시티|Mexico City|멕시코|America/Mexico_City|es-MX|Mexico City
+bogota|보고타|Bogotá|콜롬비아|America/Bogota|es-CO|Bogota Colombia
+lima|리마|Lima|페루|America/Lima|es-PE|Lima Peru
+sao-paulo|상파울루|São Paulo|브라질|America/Sao_Paulo|pt-BR|Sao Paulo Brazil
+buenos-aires|부에노스아이레스|Buenos Aires|아르헨티나|America/Buenos_Aires|es-AR|Buenos Aires Argentina
+santiago|산티아고|Santiago|칠레|America/Santiago|es-CL|Santiago Chile
+reykjavik|레이캬비크|Reykjavík|아이슬란드|Atlantic/Reykjavik|is-IS|Reykjavik Iceland
+utc|UTC|UTC|협정 세계시|UTC|en-GB|UTC GMT Zulu 협정 세계시`;
 
+const regionNames = new Intl.DisplayNames('en-US', { type: 'region' });
 const locations = rows.split('\n').map(row => {
-  const [id, name, country, zone, locale, aliases] = row.split('|');
-  return { id, name, country, zone, locale, aliases };
+  const [id, name, englishName, country, zone, locale, aliases] = row.split('|');
+  const region = id === 'hong-kong' ? 'CN' : new Intl.Locale(locale).region;
+  const englishCountry = id === 'utc' ? 'Coordinated Universal Time' : regionNames.of(region);
+  return { id, name, englishName, country, englishCountry, zone, aliases };
 });
+const koreanAreas = {
+  Africa: '아프리카', America: '아메리카', Antarctica: '남극', Arctic: '북극', Asia: '아시아',
+  Atlantic: '대서양', Australia: '호주', Europe: '유럽', Indian: '인도양', Pacific: '태평양',
+};
 const knownZones = new Set(locations.map(l => l.zone));
 for (const zone of Intl.supportedValuesOf('timeZone')) {
-  if (!knownZones.has(zone)) locations.push({ id: `tz:${zone}`, name: zone.split('/').at(-1).replaceAll('_', ' '), country: zone.split('/')[0], zone, locale: 'en-GB', aliases: zone });
+  if (knownZones.has(zone)) continue;
+  const area = zone.split('/')[0];
+  const name = zone.split('/').at(-1).replaceAll('_', ' ');
+  locations.push({ id: `tz:${zone}`, name, englishName: name, country: koreanAreas[area] ?? area, englishCountry: area, zone, aliases: zone });
 }
 for (let offset = -12; offset <= 14; offset++) {
   if (!offset) continue;
   const zone = `Etc/GMT${offset > 0 ? '-' : '+'}${Math.abs(offset)}`;
   try {
     new Intl.DateTimeFormat('en', { timeZone: zone });
-    locations.push({ id: `tz:${zone}`, name: `UTC${offset > 0 ? '+' : ''}${offset}`, country: '고정 시차', zone, locale: 'en-GB', aliases: zone });
+    const name = `UTC${offset > 0 ? '+' : ''}${offset}`;
+    locations.push({ id: `tz:${zone}`, name, englishName: name, country: '고정 시차', englishCountry: 'Fixed offset', zone, aliases: zone });
   } catch { /* IANA에서 제공하지 않는 고정 시차는 목록에 추가하지 않습니다. */ }
 }
 const byId = new Map(locations.map(l => [l.id, l]));
 function getLocation(id) { return byId.get(id); }
+function displayLocation(place, locale) {
+  return locale === 'ko-KR' ? place : { ...place, name: place.englishName, country: place.englishCountry };
+}
 function normalize(text) { return text.normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase().trim(); }
 function searchLocations(query, limit = 20) {
   const q = normalize(String(query)).replaceAll('kathmandu', 'katmandu').replaceAll('kolkata', 'calcutta');
   if (!q) return locations.slice(0, 8);
   return locations.map((item, index) => {
-    const name = normalize(`${item.name} ${item.aliases} ${item.zone} ${item.country}`).replaceAll('kathmandu', 'katmandu').replaceAll('kolkata', 'calcutta');
+    const name = normalize(`${item.name} ${item.englishName} ${item.aliases} ${item.zone} ${item.country} ${item.englishCountry}`).replaceAll('kathmandu', 'katmandu').replaceAll('kolkata', 'calcutta');
     const match = name.indexOf(q);
-    return { item, score: match < 0 ? Infinity : normalize(item.name) === q || normalize(item.zone) === q ? -2 : match === 0 ? -1 : match, index };
+    const exact = [item.name, item.englishName, item.zone].some(label => normalize(label) === q);
+    return { item, score: match < 0 ? Infinity : exact ? -2 : match === 0 ? -1 : match, index };
   }).filter(result => Number.isFinite(result.score)).sort((a, b) => a.score - b.score || a.index - b.index).slice(0, limit).map(result => result.item);
 }
-return { locations, getLocation, searchLocations };
+return { locations, getLocation, displayLocation, searchLocations };
 })();
 
 // clock-state.js
@@ -357,24 +372,213 @@ function clockWindow(instant, count, shift = 0) {
 return { SEOUL_ZONE, CLOCK_STORAGE_KEY, LEGACY_STORAGE_KEY, MAX_CITIES, MIN_CLOCK_DATE, MAX_CLOCK_DATE, createClockState, validateClockState, loadClockState, saveClockState, reorderCities, clockWindow };
 })();
 
+// locale.js
+modules["locale"] = (() => {
+function selectLocale(tag) {
+  if (typeof tag !== 'string' || !tag) return 'en-US';
+  try {
+    const { language, region } = new Intl.Locale(tag);
+    return language === 'ko' || region === 'KR' ? 'ko-KR' : 'en-US';
+  } catch {
+    return 'en-US';
+  }
+}
+
+const messages = {
+  'en-US': {
+    title: 'TimeLane · World Clock',
+    description: 'Compare local times around the world with Seoul as a reference.',
+    skipToTimeline: 'Skip to timeline',
+    home: 'TimeLane home',
+    worldClock: 'World Clock',
+    seoulLive: 'Seoul local time',
+    worldComparison: 'Compare world times',
+    searchPlaceholder: 'Add a city or time zone',
+    searchLabel: 'Search cities and time zones',
+    searchResults: 'City search results',
+    previousDay: 'Previous day',
+    nextDay: 'Next day',
+    comparisonDate: 'Comparison date',
+    timeFormat: 'Time format',
+    twentyFourHours: '24-hour',
+    twelveHours: '12-hour',
+    seoulReference: 'Seoul reference',
+    now: 'Now',
+    returnToNow: 'Return to current time',
+    cityComparison: 'Compare times by city',
+    day: 'Day',
+    evening: 'Evening',
+    night: 'Night',
+    cityLocalTime: 'City · Local time',
+    comparisonHint: 'Click an hour to center it, or drag left or right to browse.',
+    saved: 'Your cities are saved in this browser.',
+    storageUnavailable: 'Browser storage is unavailable. Changes last only in this tab.',
+    loadError: 'Your cities could not be loaded. The default list is shown.',
+    actionError: 'This action could not be completed.',
+    invalidDate: 'Choose a valid date from 1900 to 2100.',
+    noResults: 'No results. Try a city name or IANA time zone.',
+    cityLimit: limit => `You can add up to ${limit} cities, including Seoul.`,
+    moveUp: city => `Move ${city} up`,
+    moveDown: city => `Move ${city} down`,
+    removeCity: city => `Remove ${city}`,
+    timelineFor: city => `${city} timeline`,
+    comparing: (date, time) => `Comparing ${date}, ${time} in Seoul`,
+    morning: 'AM',
+    afternoon: 'PM',
+  },
+  'ko-KR': {
+    title: 'TimeLane · 세계 시계',
+    description: '서울을 기준으로 세계 시간을 간편하게 비교하는 TimeLane.',
+    skipToTimeline: '시간표로 이동',
+    home: 'TimeLane 처음으로',
+    worldClock: '세계 시계',
+    seoulLive: '서울 현재 시각',
+    worldComparison: '세계 시간 비교',
+    searchPlaceholder: '도시 또는 시간대 추가',
+    searchLabel: '도시 또는 시간대 검색',
+    searchResults: '도시 검색 결과',
+    previousDay: '이전 날짜',
+    nextDay: '다음 날짜',
+    comparisonDate: '비교 날짜',
+    timeFormat: '시간 표시 형식',
+    twentyFourHours: '24시간',
+    twelveHours: '12시간',
+    seoulReference: '서울 기준',
+    now: '현재로',
+    returnToNow: '현재 시각으로 돌아가기',
+    cityComparison: '도시별 시간 비교',
+    day: '낮',
+    evening: '저녁',
+    night: '밤',
+    cityLocalTime: '도시 · 현지 시각',
+    comparisonHint: '시간 칸을 클릭해 가운데에 놓거나, 좌우로 끌어 이동하세요.',
+    saved: '도시 목록은 이 브라우저에 저장됩니다.',
+    storageUnavailable: '브라우저 저장소를 사용할 수 없어 변경 내용은 현재 탭에서만 유지됩니다.',
+    loadError: '도시 목록을 읽을 수 없어 기본 화면을 열었습니다.',
+    actionError: '작업을 완료할 수 없습니다.',
+    invalidDate: '1900년부터 2100년 사이의 올바른 날짜를 선택해 주세요.',
+    noResults: '검색 결과가 없습니다. 도시 이름이나 IANA 시간대로 검색해 보세요.',
+    cityLimit: limit => `도시는 서울을 포함해 최대 ${limit}개까지 추가할 수 있습니다.`,
+    moveUp: city => `${city} 위로`,
+    moveDown: city => `${city} 아래로`,
+    removeCity: city => `${city} 삭제`,
+    timelineFor: city => `${city} 시간표`,
+    comparing: (date, time) => `서울 ${date} ${time} 비교 중`,
+    morning: '오전',
+    afternoon: '오후',
+  },
+};
+
+function applyTranslations(document, locale) {
+  document.documentElement.lang = locale.split('-')[0];
+  const translations = messages[locale];
+  for (const element of document.querySelectorAll('[data-i18n]')) {
+    element.textContent = translations[element.dataset.i18n];
+  }
+  for (const [suffix, attribute] of [['label', 'aria-label'], ['placeholder', 'placeholder'], ['content', 'content']]) {
+    const keyAttribute = `data-i18n-${suffix}`;
+    for (const element of document.querySelectorAll(`[${keyAttribute}]`)) {
+      element.setAttribute(attribute, translations[element.getAttribute(keyAttribute)]);
+    }
+  }
+}
+return { selectLocale, messages, applyTranslations };
+})();
+
+// current-clock.js
+modules["current-clock"] = (() => {
+const timeEndpoint = 'https://utctime.app/api/now';
+const minimumServerTime = Date.UTC(1900, 0, 1);
+const maximumServerTime = Date.UTC(2100, 11, 31, 15); // 2101년 1월 1일 00:00 서울 시각
+
+function createCurrentClock({
+  fetchTime = globalThis.fetch,
+  deviceNow = Date.now,
+  elapsedNow = () => performance.now(),
+  isOnline = () => globalThis.navigator?.onLine !== false,
+  timeoutMs = 3000,
+} = {}) {
+  let sample = null;
+  let request = null;
+
+  function now() {
+    if (!sample || !isOnline()) return deviceNow();
+    return Math.round(sample.time + elapsedNow() - sample.receivedAt);
+  }
+
+  function useDeviceTime() {
+    sample = null;
+    request?.abort();
+    request = null;
+  }
+
+  async function sync() {
+    if (!isOnline()) { useDeviceTime(); return; }
+    if (request) return;
+
+    const controller = new AbortController();
+    request = controller;
+    const startedAt = elapsedNow();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetchTime(timeEndpoint, {
+        cache: 'no-store', credentials: 'omit', redirect: 'error',
+        referrerPolicy: 'no-referrer', signal: controller.signal,
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      const receivedAt = elapsedNow();
+      if (request !== controller) return;
+      const serverTime = data?.unix_ms;
+      const delay = receivedAt - startedAt;
+      if (!isOnline() || controller.signal.aborted || delay >= timeoutMs ||
+          !Number.isSafeInteger(serverTime) || serverTime < minimumServerTime ||
+          serverTime >= maximumServerTime || Math.floor(serverTime / 1000) !== data.unix) {
+        sample = null;
+        return;
+      }
+      // 응답 시각에 왕복 시간의 절반을 더해 수신 시각을 추정합니다.
+      sample = { time: serverTime + delay / 2, receivedAt };
+    } catch {
+      // 연결 또는 응답 오류가 발생하면 기기 시계로 즉시 전환합니다.
+      if (request === controller) sample = null;
+    } finally {
+      clearTimeout(timeout);
+      if (request === controller) request = null;
+    }
+  }
+
+  return { now, sync, useDeviceTime };
+}
+return { createCurrentClock };
+})();
+
 // app.js
 modules["app"] = (() => {
-const { HOUR, MINUTE, zonedParts, dateString, pad, wallToInstant, addDays, formatTime, shortDate, utcOffset, zoneAbbreviation } = modules["time"];
-const { getLocation, searchLocations } = modules["locations"];
+const { HOUR, MINUTE, zonedParts, dateString, pad, wallToInstant, parseDate, addDays, formatTime, shortDate, utcOffset, zoneAbbreviation } = modules["time"];
+const { getLocation, searchLocations, displayLocation } = modules["locations"];
 const { SEOUL_ZONE, MAX_CITIES, MIN_CLOCK_DATE, MAX_CLOCK_DATE, createClockState, validateClockState, loadClockState, saveClockState, reorderCities, clockWindow } = modules["clock-state"];
+const { selectLocale, messages, applyTranslations } = modules["locale"];
+const { createCurrentClock } = modules["current-clock"];
 
 const $ = id => document.getElementById(id);
 const escape = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
-const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
+const locale = selectLocale(navigator.language || navigator.languages?.[0]);
+const text = messages[locale];
+const referenceDate = new Intl.DateTimeFormat(locale, { timeZone: SEOUL_ZONE, year: 'numeric', month: 'short', day: 'numeric', weekday: 'short' });
 const maxVisibleHours = 25;
 const dragThreshold = 8;
-let state = createClockState(), slots = [], selectedInstant = null, hoverInstant = null;
+const syncInterval = 120_000;
+const currentClock = createCurrentClock();
+const initialTime = currentClock.now();
+let state = createClockState(initialTime), slots = [], selectedInstant = null, hoverInstant = null;
 let visibleHours, displayedWindow, followingNow = true;
 let timelinePointer = null, suppressTimelineClick = false;
 let searchItems = [], searchIndex = -1, toastTimer;
 let startupNotice = '';
-try { state = loadClockState(localStorage); }
-catch { startupNotice = '도시 목록을 읽을 수 없어 기본 화면을 열었습니다. 기존 저장 데이터는 유지됩니다.'; }
+applyTranslations(document, locale);
+try { state = loadClockState(localStorage, initialTime); }
+catch { startupNotice = text.loadError; }
 
 function notify(message, error = false) {
   clearTimeout(toastTimer);
@@ -386,15 +590,18 @@ function notify(message, error = false) {
 function on(id, event, handler) {
   $(id).addEventListener(event, ev => {
     try { handler(ev); }
-    catch (error) { notify(error.message || '작업을 완료할 수 없습니다.', true); }
+    catch (error) {
+      console.error(error);
+      notify(text.actionError, true);
+    }
   });
 }
 function save() {
   try {
     saveClockState(localStorage, state);
-    $('save-status').textContent = '도시 목록은 이 브라우저에 저장됩니다.';
+    $('save-status').textContent = text.saved;
   } catch {
-    $('save-status').textContent = '브라우저 저장소를 사용할 수 없어 변경 내용은 현재 탭에서만 유지됩니다.';
+    $('save-status').textContent = text.storageUnavailable;
   }
 }
 function commit(change) {
@@ -402,7 +609,7 @@ function commit(change) {
   try { change(); state = validateClockState(state); render(); save(); }
   catch (error) { state = previous; render(); throw error; }
 }
-function places() { return state.locations.map(getLocation); }
+function localizedCity(id) { return displayLocation(getLocation(id), locale); }
 function percent(instant) {
   const start = slots[0].start - displayedWindow.emptyBefore * HOUR;
   const end = slots.at(-1).end + displayedWindow.emptyAfter * HOUR;
@@ -417,13 +624,12 @@ function measureVisibleHours() {
   // 가운데 한 칸의 양쪽에 같은 수의 시간 칸을 배치합니다.
   return Math.max(3, hours % 2 === 0 ? hours - 1 : hours);
 }
-function render(instant = displayedWindow?.center.start ?? Date.now(), shift = 0) {
+function render(instant = displayedWindow?.center.start ?? currentClock.now(), shift = 0) {
   visibleHours = measureVisibleHours();
   displayedWindow = clockWindow(instant, visibleHours, shift);
   slots = displayedWindow.slots;
   state.date = displayedWindow.date;
-  const date = zonedParts(displayedWindow.center.start, SEOUL_ZONE);
-  $('date-label').textContent = `${date.year}. ${pad(date.month)}. ${pad(date.day)}. (${weekdays[date.weekday]})`;
+  $('date-label').textContent = referenceDate.format(displayedWindow.center.start);
   $('date-picker').value = state.date;
   $('time-format').value = state.format;
   $('reference-offset').textContent = utcOffset(displayedWindow.center.start, SEOUL_ZONE);
@@ -432,14 +638,14 @@ function render(instant = displayedWindow?.center.start ?? Date.now(), shift = 0
   renderTimeline();
   const scroller = $('timeline-scroll');
   scroller.scrollLeft = (scroller.scrollWidth - scroller.clientWidth) / 2;
-  const now = Date.now();
+  const now = currentClock.now();
   updateLiveTime(now);
   updateComparison(now);
 }
 function hourLabel(instant, place) {
   const p = zonedParts(instant, place.zone);
   const hour = state.format === '12' ? p.hour % 12 || 12 : pad(p.hour);
-  return `<span class="hour-number">${hour}${p.minute ? `<span class="minute">:${pad(p.minute)}</span>` : ''}</span>${state.format === '12' ? `<span class="period">${p.hour < 12 ? 'am' : 'pm'}</span>` : ''}`;
+  return `<span class="hour-number">${hour}${p.minute ? `<span class="minute">:${pad(p.minute)}</span>` : ''}</span>${state.format === '12' ? `<span class="period">${p.hour < 12 ? text.morning : text.afternoon}</span>` : ''}`;
 }
 function renderTimeline() {
   const timeline = $('timeline');
@@ -450,17 +656,18 @@ function renderTimeline() {
   const emptyTrack = 'minmax(0, 60fr) ';
   timeline.style.setProperty('--columns', visibleHours);
   timeline.style.setProperty('--slot-tracks', `${emptyTrack.repeat(emptyBefore)}${tracks} ${emptyTrack.repeat(emptyAfter)}`);
-  timeline.innerHTML = `<div class="axis-row"><div class="axis-label">도시 · 현지 시각</div><div class="axis-hours">${before}${slots.map((slot, index) => {
+  timeline.innerHTML = `<div class="axis-row"><div class="axis-label">${escape(text.cityLocalTime)}</div><div class="axis-hours">${before}${slots.map((slot, index) => {
     const p = zonedParts(slot.start, SEOUL_ZONE);
     const hour = state.format === '12' ? p.hour % 12 || 12 : pad(p.hour);
     return `<span data-axis-cell="${index}">${hour}</span>`;
-  }).join('')}${after}</div></div>` + places().map((place, rowIndex) => {
+  }).join('')}${after}</div></div>` + state.locations.map((id, rowIndex) => {
+    const place = localizedCity(id);
     const fixed = place.id === 'seoul';
     const name = escape(place.name);
     const controls = fixed ? '' : `<div class="row-controls">
-      <button type="button" data-action="up" aria-label="${name} 위로"${rowIndex === 1 ? ' disabled' : ''}>↑</button>
-      <button type="button" data-action="down" aria-label="${name} 아래로"${rowIndex === state.locations.length - 1 ? ' disabled' : ''}>↓</button>
-      <button type="button" class="remove-city" data-action="remove" title="도시 삭제" aria-label="${name} 삭제">×</button>
+      <button type="button" data-action="up" aria-label="${escape(text.moveUp(place.name))}"${rowIndex === 1 ? ' disabled' : ''}>↑</button>
+      <button type="button" data-action="down" aria-label="${escape(text.moveDown(place.name))}"${rowIndex === state.locations.length - 1 ? ' disabled' : ''}>↓</button>
+      <button type="button" class="remove-city" data-action="remove" title="${escape(text.removeCity(place.name))}" aria-label="${escape(text.removeCity(place.name))}">×</button>
     </div>`;
     return `<div class="city-row${fixed ? ' seoul-row' : ''}" data-id="${escape(place.id)}">
       <div class="city-info">
@@ -468,11 +675,11 @@ function renderTimeline() {
         <div class="city-reading"><time class="city-clock"></time><p class="city-date"></p></div>
         ${controls}
       </div>
-      <div class="lane" data-row="${rowIndex}" aria-label="${name} 시간표">${before}${slots.map((slot, index) => {
+      <div class="lane" data-row="${rowIndex}" aria-label="${escape(text.timelineFor(place.name))}">${before}${slots.map((slot, index) => {
       const p = zonedParts(slot.start, place.zone);
       const phase = p.hour < 7 || p.hour >= 22 ? 'night' : p.hour >= 18 ? 'evening' : 'day';
       const dateChanged = index === 0 || dateString(slot.start, place.zone) !== dateString(slots[index - 1].start, place.zone);
-      const label = `${place.name} ${shortDate(slot.start, place.zone)} ${formatTime(slot.start, place.zone, state.format)} ${utcOffset(slot.start, place.zone)}`;
+      const label = `${place.name} ${shortDate(slot.start, place.zone, locale)} ${formatTime(slot.start, place.zone, state.format, locale)} ${utcOffset(slot.start, place.zone)}`;
       const tabIndex = slot.start === displayedWindow.center.start ? 0 : -1;
       return `<button type="button" class="time-cell ${phase}${dateChanged && index ? ' date-boundary' : ''}" data-cell="${index}" tabindex="${tabIndex}" aria-label="${escape(label)}" aria-pressed="false" title="${escape(label)}">${dateChanged ? `<span class="day-marker">${p.month}/${p.day}</span>` : ''}${hourLabel(slot.start, place)}</button>`;
     }).join('')}${after}<div class="comparison-band" hidden></div><div class="now-line" aria-hidden="true" hidden></div></div></div>`;
@@ -480,7 +687,7 @@ function renderTimeline() {
 }
 function updateLiveTime(now) {
   const clock = $('live-time');
-  clock.textContent = formatTime(now, SEOUL_ZONE, state.format, 'ko-KR', true);
+  clock.textContent = formatTime(now, SEOUL_ZONE, state.format, locale, true);
   clock.dateTime = new Date(now).toISOString();
 
   const timeline = $('timeline');
@@ -499,15 +706,15 @@ function updateLiveTime(now) {
     if (!line.hidden) line.style.left = `${position}%`;
   }
 }
-function updateComparison(now = Date.now()) {
+function updateComparison(now = currentClock.now()) {
   const instant = hoverInstant ?? selectedInstant ?? now;
   const fixed = selectedInstant !== null;
   const comparing = hoverInstant !== null || fixed;
   // 행 교체 중 발생하는 focusout에서도 기존 DOM 행의 도시를 정확히 갱신합니다.
   document.querySelectorAll('.city-row').forEach(row => {
-    const place = getLocation(row.dataset.id);
-    row.querySelector('.city-clock').textContent = formatTime(instant, place.zone, state.format);
-    row.querySelector('.city-date').textContent = shortDate(instant, place.zone);
+    const place = localizedCity(row.dataset.id);
+    row.querySelector('.city-clock').textContent = formatTime(instant, place.zone, state.format, locale);
+    row.querySelector('.city-date').textContent = shortDate(instant, place.zone, locale);
     const abbreviation = zoneAbbreviation(instant, place.zone);
     row.querySelector('.zone-abbreviation').textContent = ` · ${abbreviation}`;
     row.querySelector('.city-zone').title = `${place.country} · ${abbreviation} (${place.zone})`;
@@ -524,7 +731,9 @@ function updateComparison(now = Date.now()) {
     const selected = selectedInstant === slots[Number(cell.dataset.cell)]?.start;
     if (cell.getAttribute('aria-pressed') !== String(selected)) cell.setAttribute('aria-pressed', String(selected));
   });
-  $('comparison-status').textContent = comparing ? `서울 ${shortDate(instant, SEOUL_ZONE)} ${formatTime(instant, SEOUL_ZONE, state.format)} 비교 중` : '시간 칸을 클릭해 가운데에 놓거나, 좌우로 끌어 이동하세요.';
+  $('comparison-status').textContent = comparing
+    ? text.comparing(shortDate(instant, SEOUL_ZONE, locale), formatTime(instant, SEOUL_ZONE, state.format, locale))
+    : text.comparisonHint;
 }
 function showWindowAt(instant, follow = false) {
   followingNow = follow;
@@ -533,10 +742,10 @@ function showWindowAt(instant, follow = false) {
   render(instant);
 }
 function changeDate(date) {
-  if (date === dateString(Date.now(), SEOUL_ZONE)) returnToNow();
+  if (date === dateString(currentClock.now(), SEOUL_ZONE)) returnToNow();
   else showWindowAt(wallToInstant(date, '12:00', SEOUL_ZONE));
 }
-function returnToNow() { showWindowAt(Date.now(), true); }
+function returnToNow() { showWindowAt(currentClock.now(), true); }
 
 function selectTime(cell) {
   const instant = slots[Number(cell.dataset.cell)].start;
@@ -603,10 +812,11 @@ function endTimelinePointer(event) {
 function showSearch() {
   searchItems = searchLocations($('city-search').value);
   searchIndex = -1;
-  $('search-results').innerHTML = searchItems.length ? searchItems.map((place, index) => {
+  $('search-results').innerHTML = searchItems.length ? searchItems.map((result, index) => {
+    const place = displayLocation(result, locale);
     const added = state.locations.includes(place.id);
     return `<button type="button" class="search-option" role="option" aria-selected="false" id="search-option-${index}" data-search-index="${index}"${added ? ' disabled' : ''}><span><strong>${escape(place.name)}</strong><small>${escape(place.country)} · ${escape(place.zone)}</small></span><span class="add-symbol" aria-hidden="true">${added ? '✓' : '+'}</span></button>`;
-  }).join('') : '<p class="search-empty">검색 결과가 없습니다. 영문 도시나 시간대로도 검색해 보세요.</p>';
+  }).join('') : `<p class="search-empty">${escape(text.noResults)}</p>`;
   $('search-results').hidden = false;
   $('city-search').setAttribute('aria-expanded', 'true');
   $('city-search').removeAttribute('aria-activedescendant');
@@ -619,7 +829,10 @@ function closeSearch() {
 function addCity(index) {
   const place = searchItems[index];
   if (!place || state.locations.includes(place.id)) return;
-  if (state.locations.length >= MAX_CITIES) throw new Error(`도시는 서울을 포함해 최대 ${MAX_CITIES}개까지 추가할 수 있습니다.`);
+  if (state.locations.length >= MAX_CITIES) {
+    notify(text.cityLimit(MAX_CITIES), true);
+    return;
+  }
   commit(() => state.locations.push(place.id));
   $('city-search').value = '';
   $('city-search').focus(); closeSearch();
@@ -651,8 +864,14 @@ on('previous-day', 'click', () => changeDate(addDays(state.date, -1)));
 on('next-day', 'click', () => changeDate(addDays(state.date, 1)));
 on('current-time', 'click', returnToNow);
 on('date-picker', 'change', event => {
-  try { changeDate(event.target.value); }
-  catch (error) { event.target.value = state.date; throw error; }
+  const date = event.target.value;
+  try { parseDate(date); }
+  catch {
+    event.target.value = state.date;
+    notify(text.invalidDate, true);
+    return;
+  }
+  changeDate(date);
 });
 on('time-format', 'change', event => commit(() => { state.format = event.target.value; }));
 on('timeline', 'pointerdown', beginTimelinePointer);
@@ -714,7 +933,7 @@ document.addEventListener('keydown', event => {
 });
 function tick() {
   if (document.hidden) return;
-  const now = Date.now();
+  const now = currentClock.now();
   const { start, end } = displayedWindow.center;
   if (followingNow && !timelinePointer && selectedInstant === null && hoverInstant === null && (now < start || now >= end)) {
     render(now);
@@ -723,14 +942,34 @@ function tick() {
   updateLiveTime(now);
   updateComparison(now);
 }
-document.addEventListener('visibilitychange', tick);
+async function refreshClock() {
+  if (document.hidden) return;
+  await currentClock.sync();
+  tick();
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) return;
+  tick();
+  refreshClock();
+});
+window.addEventListener('offline', () => {
+  currentClock.useDeviceTime();
+  tick();
+});
+window.addEventListener('online', refreshClock);
+window.addEventListener('pageshow', event => { if (event.persisted) refreshClock(); });
 const clock = setInterval(tick, 1000);
+const clockSync = setInterval(refreshClock, syncInterval);
 render();
+refreshClock();
 const timelineResize = new ResizeObserver(() => { if (measureVisibleHours() !== visibleHours) render(); });
 timelineResize.observe($('timeline-scroll'));
 window.addEventListener('pagehide', event => {
+  currentClock.useDeviceTime();
   if (event.persisted) return;
   clearInterval(clock);
+  clearInterval(clockSync);
   timelineResize.disconnect();
 });
 if (startupNotice) { $('save-status').textContent = startupNotice; notify(startupNotice, true); }

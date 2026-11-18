@@ -1,47 +1,47 @@
 <!doctype html>
-<html lang="ko">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#20282f">
-  <meta name="description" content="서울을 기준으로 세계 시간을 간편하게 비교하는 TimeLane.">
-  <title>TimeLane · 세계 시계</title>
+  <meta name="description" content="Compare local times around the world with Seoul as a reference." data-i18n-content="description">
+  <title data-i18n="title">TimeLane · World Clock</title>
   <link rel="icon" href="./assets/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./src/styles.css">
   <script defer src="./assets/timelane.js"></script>
 </head>
 <body>
-  <a class="skip-link" href="#timeline">시간표로 이동</a>
+  <a class="skip-link" href="#timeline" data-i18n="skipToTimeline">Skip to timeline</a>
   <header class="site-header">
-    <a class="brand" href="./index.html" aria-label="TimeLane 처음으로"><img src="./assets/icon.svg" alt="" width="34" height="34"><strong>TimeLane</strong></a>
-    <span class="header-label">세계 시계</span>
-    <div class="live-clock"><span class="status-dot" aria-hidden="true"></span><span>서울 현재 시각</span><time id="live-time">--:--:--</time></div>
+    <a class="brand" href="./index.html" aria-label="TimeLane home" data-i18n-label="home"><img src="./assets/icon.svg" alt="" width="34" height="34"><strong>TimeLane</strong></a>
+    <span class="header-label" data-i18n="worldClock">World Clock</span>
+    <div class="live-clock"><span class="status-dot" aria-hidden="true"></span><span data-i18n="seoulLive">Seoul local time</span><time id="live-time">--:--:--</time></div>
   </header>
   <main>
-    <h1 class="sr-only">세계 시간 비교</h1>
-    <section class="workspace" aria-label="세계 시간 비교">
+    <h1 class="sr-only" data-i18n="worldComparison">Compare world times</h1>
+    <section class="workspace" aria-label="Compare world times" data-i18n-label="worldComparison">
       <div class="toolbar">
         <div class="search-wrap">
-          <label class="search-field"><span aria-hidden="true" class="search-icon">⌕</span><input id="city-search" type="search" autocomplete="off" placeholder="도시 또는 시간대 추가" aria-label="도시 또는 시간대 검색" aria-expanded="false" aria-controls="search-results" role="combobox"></label>
-          <div id="search-results" class="search-results" role="listbox" aria-label="도시 검색 결과" hidden></div>
+          <label class="search-field"><span aria-hidden="true" class="search-icon">⌕</span><input id="city-search" type="search" autocomplete="off" placeholder="Add a city or time zone" data-i18n-placeholder="searchPlaceholder" aria-label="Search cities and time zones" data-i18n-label="searchLabel" aria-expanded="false" aria-controls="search-results" role="combobox"></label>
+          <div id="search-results" class="search-results" role="listbox" aria-label="City search results" data-i18n-label="searchResults" hidden></div>
         </div>
         <div class="date-navigation">
-          <button id="previous-day" class="icon-button" aria-label="이전 날짜">‹</button>
-          <label class="date-field"><span id="date-label"></span><input id="date-picker" type="date" min="1900-01-01" max="2100-12-31" aria-label="비교 날짜"></label>
-          <button id="next-day" class="icon-button" aria-label="다음 날짜">›</button>
+          <button id="previous-day" class="icon-button" aria-label="Previous day" data-i18n-label="previousDay">‹</button>
+          <label class="date-field"><span id="date-label"></span><input id="date-picker" type="date" min="1900-01-01" max="2100-12-31" aria-label="Comparison date" data-i18n-label="comparisonDate"></label>
+          <button id="next-day" class="icon-button" aria-label="Next day" data-i18n-label="nextDay">›</button>
         </div>
-        <label class="format-field"><span class="sr-only">시간 표시 형식</span><select id="time-format"><option value="24">24시간</option><option value="12">12시간</option></select></label>
+        <label class="format-field"><span class="sr-only" data-i18n="timeFormat">Time format</span><select id="time-format"><option value="24" data-i18n="twentyFourHours">24-hour</option><option value="12" data-i18n="twelveHours">12-hour</option></select></label>
       </div>
       <div class="timeline-caption">
-        <p><strong>서울 기준</strong><span id="reference-offset">UTC+09:00</span></p>
-        <button id="current-time" class="button" type="button" aria-controls="timeline" aria-label="현재 시각으로 돌아가기">현재로</button>
+        <p><strong data-i18n="seoulReference">Seoul reference</strong><span id="reference-offset">UTC+09:00</span></p>
+        <button id="current-time" class="button" type="button" aria-controls="timeline" aria-label="Return to current time" data-i18n="now" data-i18n-label="returnToNow">Now</button>
       </div>
-      <div class="timeline-scroll" id="timeline-scroll"><div id="timeline" class="timeline" tabindex="-1" aria-label="도시별 시간 비교"></div></div>
-      <div class="timeline-footer"><div class="legend"><span><i class="legend-day" aria-hidden="true"></i>낮</span><span><i class="legend-evening" aria-hidden="true"></i>저녁</span><span><i class="legend-night" aria-hidden="true"></i>밤</span></div><p id="comparison-status">시간 칸을 클릭해 가운데에 놓거나, 좌우로 끌어 이동하세요.</p></div>
+      <div class="timeline-scroll" id="timeline-scroll"><div id="timeline" class="timeline" tabindex="-1" aria-label="Compare times by city" data-i18n-label="cityComparison"></div></div>
+      <div class="timeline-footer"><div class="legend"><span><i class="legend-day" aria-hidden="true"></i><span data-i18n="day">Day</span></span><span><i class="legend-evening" aria-hidden="true"></i><span data-i18n="evening">Evening</span></span><span><i class="legend-night" aria-hidden="true"></i><span data-i18n="night">Night</span></span></div><p id="comparison-status" data-i18n="comparisonHint">Click an hour to center it, or drag left or right to browse.</p></div>
     </section>
-    <p id="save-status" class="save-status">도시 목록은 이 브라우저에 저장됩니다.</p>
+    <p id="save-status" class="save-status" data-i18n="saved">Your cities are saved in this browser.</p>
   </main>
   <div id="toast" role="status" aria-live="polite" class="toast" hidden></div>
-  <noscript><p class="notice">시간표를 보려면 브라우저에서 JavaScript를 켜 주세요.</p></noscript>
+  <noscript><p class="notice">Enable JavaScript to view the timeline.</p></noscript>
 </body>
 </html>
