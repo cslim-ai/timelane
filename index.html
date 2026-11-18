@@ -7,8 +7,8 @@
   <meta name="description" content="Compare local times around the world with Seoul as a reference." data-i18n-content="description">
   <title data-i18n="title">TimeLane · World Clock</title>
   <link rel="icon" href="./assets/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./src/styles.css?v=2">
-  <script defer src="./assets/timelane.js"></script>
+  <link rel="stylesheet" href="./src/styles.css?v=3">
+  <script defer src="./assets/timelane.js?v=2"></script>
 </head>
 <body>
   <a class="skip-link" href="#timeline" data-i18n="skipToTimeline">Skip to timeline</a>
@@ -17,14 +17,14 @@
     <span class="header-label" data-i18n="worldClock">World Clock</span>
     <div class="live-clock">
       <span id="clock-source" class="clock-source" data-source="device">
-        <span class="clock-source-icon" role="img" tabindex="0" aria-label="Time source" data-i18n-label="clockSource" aria-describedby="clock-source-tooltip">
+        <button type="button" class="clock-source-icon" aria-label="Time source" data-i18n-label="clockSource" aria-describedby="clock-source-tooltip" aria-expanded="false" aria-controls="clock-source-tooltip">
           <svg class="source-server" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
             <rect x="2.5" y="3" width="15" height="6" rx="1.5"/><rect x="2.5" y="11" width="15" height="6" rx="1.5"/><path d="M6 6h.5M6 14h.5" stroke-linecap="round"/>
           </svg>
           <svg class="source-device" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
             <rect x="2.5" y="3" width="15" height="10.5" rx="1.5"/><path d="M10 13.5V17m-3.5 0h7" stroke-linecap="round"/>
           </svg>
-        </span>
+        </button>
         <span id="clock-source-tooltip" class="clock-source-tooltip" role="tooltip" data-i18n="clockDeviceSource">Time from this device’s system clock.</span>
       </span>
       <span data-i18n="seoulLive">Seoul local time</span><time id="live-time">--:--:--</time>

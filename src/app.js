@@ -16,6 +16,7 @@ const wheelLinesPerHour = 3;
 const syncInterval = 120_000;
 const currentClock = createCurrentClock();
 const clockSource = $('clock-source');
+const clockSourceIcon = clockSource.querySelector('button');
 const initialTime = currentClock.now();
 let state = createClockState(initialTime), slots = [], selectedInstant = null, hoverInstant = null;
 let visibleHours, displayedWindow, followingNow = true;
@@ -328,7 +329,10 @@ on('city-search', 'keydown', event => {
     addCity(searchIndex < 0 ? searchItems.findIndex(place => !state.locations.includes(place.id)) : searchIndex);
   }
 });
-document.addEventListener('pointerdown', event => { if (!event.target.closest('.search-wrap')) closeSearch(); });
+document.addEventListener('pointerdown', event => {
+  if (!event.target.closest('.search-wrap')) closeSearch();
+  if (!clockSource.contains(event.target)) setClockTooltip(false);
+});
 on('previous-day', 'click', () => changeDate(addDays(state.date, -1)));
 on('next-day', 'click', () => changeDate(addDays(state.date, 1)));
 on('current-time', 'click', returnToNow);
@@ -397,13 +401,28 @@ on('timeline', 'keydown', event => {
   lane.querySelectorAll('[data-cell]').forEach(button => { button.tabIndex = Number(button.dataset.cell) === next ? 0 : -1; });
   lane.querySelector(`[data-cell="${next}"]`).focus();
 });
-clockSource.addEventListener('mouseenter', () => clockSource.removeAttribute('data-dismissed'));
-clockSource.addEventListener('focusin', () => clockSource.removeAttribute('data-dismissed'));
+function setClockTooltip(visible) {
+  clockSourceIcon.setAttribute('aria-expanded', String(visible));
+}
+
+clockSourceIcon.addEventListener('click', () => setClockTooltip(true));
+clockSource.addEventListener('pointerenter', event => {
+  if (event.pointerType === 'mouse') setClockTooltip(true);
+});
+clockSource.addEventListener('pointerleave', event => {
+  if (event.pointerType === 'mouse' && !clockSourceIcon.matches(':focus-visible')) setClockTooltip(false);
+});
+clockSourceIcon.addEventListener('focus', () => {
+  if (clockSourceIcon.matches(':focus-visible')) setClockTooltip(true);
+});
+clockSourceIcon.addEventListener('blur', event => {
+  if (event.relatedTarget) setClockTooltip(false);
+});
 document.addEventListener('keydown', event => {
   if (event.key === '/' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) { event.preventDefault(); $('city-search').focus(); }
   if (event.key !== 'Escape') return;
-  if (clockSource.matches(':is(:hover, :focus-within):not([data-dismissed])')) {
-    clockSource.dataset.dismissed = '';
+  if (clockSourceIcon.getAttribute('aria-expanded') === 'true') {
+    setClockTooltip(false);
     return;
   }
   closeSearch(); selectedInstant = null; hoverInstant = null; updateComparison();
