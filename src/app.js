@@ -405,7 +405,14 @@ function setClockTooltip(visible) {
   clockSourceIcon.setAttribute('aria-expanded', String(visible));
 }
 
-clockSourceIcon.addEventListener('click', () => setClockTooltip(true));
+let dismissClockTooltipOnTap = false;
+clockSourceIcon.addEventListener('pointerdown', event => {
+  const tap = event.pointerType === 'touch' || event.pointerType === 'pen';
+  dismissClockTooltipOnTap = tap && clockSourceIcon.getAttribute('aria-expanded') === 'true';
+});
+clockSourceIcon.addEventListener('click', event => {
+  setClockTooltip(event.detail === 0 || !dismissClockTooltipOnTap);
+});
 clockSource.addEventListener('pointerenter', event => {
   if (event.pointerType === 'mouse') setClockTooltip(true);
 });
