@@ -5,5 +5,5 @@
   "type": "module",
   "description": "서울 기준의 간단한 로컬 세계 시계",
   "engines": { "node": ">=22" },
-  "scripts": { "start": "node server.mjs", "build": "node scripts/build-browser.mjs", "test": "node --test" }
+  "scripts": { "build": "node scripts/build-browser.mjs", "test": "node --test" }
 }
