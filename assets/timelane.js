@@ -653,9 +653,8 @@ function render(instant = displayedWindow?.center.start ?? currentClock.now(), s
   renderTimeline();
   const scroller = $('timeline-scroll');
   scroller.scrollLeft = (scroller.scrollWidth - scroller.clientWidth) / 2;
-  const now = currentClock.now();
-  updateLiveTime(now);
-  updateComparison(now);
+  updateLiveTime(currentClock.now());
+  updateComparison();
 }
 function hourLabel(instant, place) {
   const p = zonedParts(instant, place.zone);
@@ -711,6 +710,15 @@ function updateLiveTime(now) {
   }
 
   const timeline = $('timeline');
+  for (const row of timeline.querySelectorAll('.city-row')) {
+    const place = localizedCity(row.dataset.id);
+    row.querySelector('.city-clock').textContent = formatTime(now, place.zone, state.format, locale);
+    row.querySelector('.city-date').textContent = shortDate(now, place.zone, locale);
+    const abbreviation = zoneAbbreviation(now, place.zone);
+    row.querySelector('.zone-abbreviation').textContent = ` · ${abbreviation}`;
+    row.querySelector('.city-zone').title = `${place.country} · ${abbreviation} (${place.zone})`;
+  }
+
   const currentSlot = slots.findIndex(slot => now >= slot.start && now < slot.end);
   const currentCells = `[data-axis-cell="${currentSlot}"], [data-cell="${currentSlot}"]`;
   for (const cell of timeline.querySelectorAll('[aria-current="time"]')) {
@@ -726,19 +734,10 @@ function updateLiveTime(now) {
     if (!line.hidden) line.style.left = `${position}%`;
   }
 }
-function updateComparison(now = currentClock.now()) {
-  const instant = hoverInstant ?? selectedInstant ?? now;
+function updateComparison() {
+  const instant = hoverInstant ?? selectedInstant;
   const fixed = selectedInstant !== null;
-  const comparing = hoverInstant !== null || fixed;
-  // 행 교체 중 발생하는 focusout에서도 기존 DOM 행의 도시를 정확히 갱신합니다.
-  document.querySelectorAll('.city-row').forEach(row => {
-    const place = localizedCity(row.dataset.id);
-    row.querySelector('.city-clock').textContent = formatTime(instant, place.zone, state.format, locale);
-    row.querySelector('.city-date').textContent = shortDate(instant, place.zone, locale);
-    const abbreviation = zoneAbbreviation(instant, place.zone);
-    row.querySelector('.zone-abbreviation').textContent = ` · ${abbreviation}`;
-    row.querySelector('.city-zone').title = `${place.country} · ${abbreviation} (${place.zone})`;
-  });
+  const comparing = instant !== null;
   const index = comparing ? slots.findIndex(slot => instant >= slot.start && instant < slot.end) : -1;
   document.querySelectorAll('.comparison-band').forEach(band => {
     band.hidden = index < 0;
@@ -1010,7 +1009,6 @@ function tick() {
     return;
   }
   updateLiveTime(now);
-  updateComparison(now);
 }
 async function refreshClock() {
   if (document.hidden) return;
