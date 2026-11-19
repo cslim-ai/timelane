@@ -230,20 +230,11 @@ function changeDate(date) {
 function returnToNow() { showWindowAt(currentClock.now(), true); }
 
 function selectTime(cell) {
-  const instant = slots[Number(cell.dataset.cell)].start;
-  const row = cell.closest('.lane').dataset.row;
-  selectedInstant = instant;
+  selectedInstant = slots[Number(cell.dataset.cell)].start;
   hoverInstant = null;
   followingNow = false;
-
-  if (instant === displayedWindow.center.start) {
-    updateCityReadings(instant);
-    updateComparison();
-    return;
-  }
-  render(instant);
-  const index = slots.findIndex(slot => slot.start === instant);
-  $('timeline').querySelector(`.lane[data-row="${row}"] [data-cell="${index}"]`).focus({ preventScroll: true });
+  updateCityReadings(selectedInstant);
+  updateComparison();
 }
 
 function beginTimelinePointer(event) {

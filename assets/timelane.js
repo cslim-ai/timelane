@@ -415,7 +415,7 @@ const messages = {
     cityLocalTime: 'City · Local time',
     axisCurrent: 'Now',
     axisSelected: 'Selected',
-    comparisonHint: 'Click an hour to center it. Drag or scroll over the timeline to browse.',
+    comparisonHint: 'Click an hour to compare. Drag or scroll over the timeline to browse.',
     saved: 'Your cities are saved in this browser.',
     storageUnavailable: 'Browser storage is unavailable. Changes last only in this tab.',
     loadError: 'Your cities could not be loaded. The default list is shown.',
@@ -461,7 +461,7 @@ const messages = {
     cityLocalTime: '도시 · 현지 시각',
     axisCurrent: '현재',
     axisSelected: '선택',
-    comparisonHint: '시간 칸을 클릭해 가운데에 놓으세요. 시간표는 드래그하거나 휠을 돌려 이동할 수 있습니다.',
+    comparisonHint: '시간 칸을 클릭해 비교하세요. 시간표는 드래그하거나 휠을 돌려 이동할 수 있습니다.',
     saved: '도시 목록은 이 브라우저에 저장됩니다.',
     storageUnavailable: '브라우저 저장소를 사용할 수 없어 변경 내용은 현재 탭에서만 유지됩니다.',
     loadError: '도시 목록을 읽을 수 없어 기본 화면을 열었습니다.',
@@ -797,20 +797,11 @@ function changeDate(date) {
 function returnToNow() { showWindowAt(currentClock.now(), true); }
 
 function selectTime(cell) {
-  const instant = slots[Number(cell.dataset.cell)].start;
-  const row = cell.closest('.lane').dataset.row;
-  selectedInstant = instant;
+  selectedInstant = slots[Number(cell.dataset.cell)].start;
   hoverInstant = null;
   followingNow = false;
-
-  if (instant === displayedWindow.center.start) {
-    updateCityReadings(instant);
-    updateComparison();
-    return;
-  }
-  render(instant);
-  const index = slots.findIndex(slot => slot.start === instant);
-  $('timeline').querySelector(`.lane[data-row="${row}"] [data-cell="${index}"]`).focus({ preventScroll: true });
+  updateCityReadings(selectedInstant);
+  updateComparison();
 }
 
 function beginTimelinePointer(event) {
