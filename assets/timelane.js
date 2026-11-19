@@ -786,21 +786,25 @@ function updateComparison() {
 }
 function showWindowAt(instant, follow = false, shift = 0) {
   followingNow = follow;
-  selectedInstant = null;
   hoverInstant = null;
   render(instant, shift);
 }
 function changeDate(date) {
-  if (date === dateString(currentClock.now(), SEOUL_ZONE)) returnToNow();
+  const now = currentClock.now();
+  if (date === dateString(now, SEOUL_ZONE)) showWindowAt(now, true);
   else showWindowAt(wallToInstant(date, '12:00', SEOUL_ZONE));
 }
-function returnToNow() { showWindowAt(currentClock.now(), true); }
+function returnToNow() {
+  selectedInstant = null;
+  showWindowAt(currentClock.now(), true);
+}
 
 function selectTime(cell) {
-  selectedInstant = slots[Number(cell.dataset.cell)].start;
+  const instant = slots[Number(cell.dataset.cell)].start;
+  selectedInstant = selectedInstant === instant ? null : instant;
   hoverInstant = null;
   followingNow = false;
-  updateCityReadings(selectedInstant);
+  updateCityReadings(selectedInstant ?? currentClock.now());
   updateComparison();
 }
 
@@ -840,7 +844,6 @@ function panTimeline(event) {
   if (shift === pointer.shift) return;
   pointer.shift = shift;
   followingNow = false;
-  selectedInstant = null;
   render(pointer.origin, shift);
 }
 
