@@ -91,8 +91,8 @@ main { max-width: 1496px; margin: 0 auto; padding: 28px 28px 20px; }
   display: grid; grid-template-columns: var(--slot-tracks);
 }
 .axis-hours > span { display: grid; place-items: center; font-size: 13px; color: #beccd4; border-right: 1px solid #45555f; font-variant-numeric: tabular-nums; }
-.axis-hours > .axis-cell { grid-template-rows: calc(2 * var(--axis-status-line-height)) auto; gap: 1px; padding: 2px 0 3px; line-height: 1.25; }
-.axis-status { display: grid; align-self: end; justify-items: center; max-width: 100%; font-size: clamp(10px, 2.8vw, 11px); font-weight: 650; line-height: var(--axis-status-line-height); letter-spacing: -.15px; text-align: center; overflow-wrap: anywhere; }
+.axis-hours > .axis-cell { grid-template-rows: calc(2 * var(--axis-status-line-height)) auto; gap: 1px; padding: 1px 0 3px; line-height: 1.25; }
+.axis-status { display: grid; justify-items: center; max-width: 100%; font-size: clamp(10px, 2.8vw, 11px); font-weight: 650; line-height: var(--axis-status-line-height); letter-spacing: -.15px; text-align: center; overflow-wrap: anywhere; }
 .axis-cell[aria-current="time"][data-selected] .axis-status { white-space: nowrap; }
 .axis-status > span { display: none; }
 .axis-cell[aria-current="time"] .axis-status-current { display: block; color: #ffd1d5; }
