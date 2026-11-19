@@ -172,15 +172,14 @@ function updateCityReadings(instant) {
 }
 function updateComparison() {
   const instant = hoverInstant ?? selectedInstant;
-  const fixed = selectedInstant !== null;
   const comparing = instant !== null;
-  const index = comparing ? slots.findIndex(slot => instant >= slot.start && instant < slot.end) : -1;
+  const preview = hoverInstant === selectedInstant ? null : hoverInstant;
+  const index = preview === null ? -1 : slots.findIndex(slot => preview >= slot.start && preview < slot.end);
   document.querySelectorAll('.comparison-band').forEach(band => {
     band.hidden = index < 0;
     if (index < 0) return;
     band.style.left = `${percent(slots[index].start)}%`;
     band.style.width = `${percent(slots[index].end) - percent(slots[index].start)}%`;
-    band.classList.toggle('locked', fixed && hoverInstant === null);
   });
   document.querySelectorAll('.time-cell').forEach(cell => {
     const selected = selectedInstant === slots[Number(cell.dataset.cell)]?.start;

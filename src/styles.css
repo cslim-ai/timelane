@@ -123,8 +123,12 @@ main { max-width: 1496px; margin: 0 auto; padding: 28px 28px 20px; }
 .night .day-marker { color: #d1dfec; }
 .evening .day-marker { color: #e5e0cc; }
 .date-boundary { border-left: 1px solid #b6c2be; }
-.comparison-band { position: absolute; top: 0; bottom: 0; z-index: 2; pointer-events: none; border-left: 1px solid #b9e2cd; border-right: 1px solid #b9e2cd; background: #c8ebd91f; }
-.comparison-band.locked { background: #c8ebd932; border-width: 2px; }
+.comparison-band { position: absolute; top: 0; bottom: 0; z-index: 2; pointer-events: none; border-inline: 1px dashed #bdd5e3; background: #bdd5e314; }
+.time-cell[aria-pressed="true"]::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  border-inline: 2px solid #b9e2cd; background: #c8ebd932;
+}
+.time-cell[aria-pressed="true"] .hour-number { font-weight: 700; }
 .now-line { position: absolute; top: 0; bottom: 0; border-left: 2px solid #ffa5ae; pointer-events: none; z-index: 3; }
 .now-line:before { content: ""; position: absolute; left: -4px; top: 0; width: 6px; height: 6px; border-radius: 50%; background: #ffa5ae; }
 .timeline-footer { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 15px 20px; min-height: 52px; }
