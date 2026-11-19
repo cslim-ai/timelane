@@ -9,27 +9,26 @@ export function createCurrentClock({
   isOnline = () => globalThis.navigator?.onLine !== false,
   timeoutMs = 3000,
 } = {}) {
-  let sample = null;
+  let sample = { time: deviceNow(), receivedAt: elapsedNow(), source: 'device' };
+  let attempted = false;
   let request = null;
 
   function source() {
-    return sample && isOnline() ? 'server' : 'device';
+    return sample.source;
   }
 
   function now() {
-    if (source() === 'device') return deviceNow();
     return Math.round(sample.time + elapsedNow() - sample.receivedAt);
   }
 
-  function useDeviceTime() {
-    sample = null;
+  function cancelSync() {
     request?.abort();
-    request = null;
   }
 
   async function sync() {
-    if (!isOnline()) { useDeviceTime(); return; }
-    if (request) return;
+    if (attempted) return;
+    attempted = true;
+    if (!isOnline()) return;
 
     const controller = new AbortController();
     request = controller;
@@ -43,25 +42,22 @@ export function createCurrentClock({
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
       const receivedAt = elapsedNow();
-      if (request !== controller) return;
       const serverTime = data?.unix_ms;
       const delay = receivedAt - startedAt;
-      if (!isOnline() || controller.signal.aborted || delay >= timeoutMs ||
+      if (controller.signal.aborted || delay >= timeoutMs ||
           !Number.isSafeInteger(serverTime) || serverTime < minimumServerTime ||
           serverTime >= maximumServerTime || Math.floor(serverTime / 1000) !== data.unix) {
-        sample = null;
         return;
       }
       // 응답 시각에 왕복 시간의 절반을 더해 수신 시각을 추정합니다.
-      sample = { time: serverTime + delay / 2, receivedAt };
+      sample = { time: serverTime + delay / 2, receivedAt, source: 'server' };
     } catch {
-      // 연결 또는 응답 오류가 발생하면 기기 시계로 즉시 전환합니다.
-      if (request === controller) sample = null;
+      // 시작 시 읽어 둔 기기 시각을 계속 사용합니다.
     } finally {
       clearTimeout(timeout);
-      if (request === controller) request = null;
+      request = null;
     }
   }
 
-  return { now, source, sync, useDeviceTime };
+  return { now, source, sync, cancelSync };
 }

@@ -9,9 +9,10 @@ function setup(fetchTime = async () => validResponse(), options = {}) {
   let device = serverNow + 7200000;
   let elapsed = 1000;
   let online = true;
+  let deviceReads = 0;
   const clock = createCurrentClock({
     fetchTime,
-    deviceNow: () => device,
+    deviceNow: () => { deviceReads++; return device; },
     elapsedNow: () => elapsed,
     isOnline: () => online,
     ...options,
@@ -19,6 +20,7 @@ function setup(fetchTime = async () => validResponse(), options = {}) {
   return {
     clock,
     get device() { return device; },
+    get deviceReads() { return deviceReads; },
     advance: (time, adjustment = 0) => { elapsed += time; device += time + adjustment; },
     setOnline: value => { online = value; },
   };
@@ -37,24 +39,39 @@ test('서버 응답 전에는 기기 시각을 쓰고, 동기화 후에는 네�
   assert.equal(clock.now(), serverNow + 1100);
 });
 
-test('연결이 끊기면 기기 시계로 전환하고 재연결하면 다시 서버 시각을 사용합니다', async () => {
+test('서버 동기화는 시작할 때 한 번만 시도하고 네트워크 변경 후에도 같은 기준을 사용합니다', async () => {
   let attempts = 0;
   const env = setup(async () => { attempts++; return validResponse(); });
   await env.clock.sync();
   assert.equal(env.clock.now(), serverNow);
   env.setOnline(false);
-  assert.equal(env.clock.source(), 'device');
-  env.clock.useDeviceTime();
+  assert.equal(env.clock.source(), 'server');
   await env.clock.sync();
   assert.equal(attempts, 1);
-  assert.equal(env.clock.now(), env.device);
   env.setOnline(true);
+  env.advance(1000, 60000);
   await env.clock.sync();
-  assert.equal(attempts, 2);
-  assert.equal(env.clock.now(), serverNow);
+  assert.equal(attempts, 1);
+  assert.equal(env.clock.now(), serverNow + 1000);
+  assert.equal(env.deviceReads, 1);
 });
 
-test('네트워크 오류, HTTP 오류 또는 잘못된 응답이면 이전 동기화 값을 폐기합니다', async () => {
+test('오프라인 시작 후에는 처음 읽은 기기 시각과 경과 시간을 사용합니다', async () => {
+  let attempts = 0;
+  const env = setup(async () => { attempts++; return validResponse(); });
+  const initialTime = env.device;
+  env.setOnline(false);
+  await env.clock.sync();
+  env.advance(1000, 60000);
+  env.setOnline(true);
+  await env.clock.sync();
+  assert.equal(attempts, 0);
+  assert.equal(env.clock.now(), initialTime + 1000);
+  assert.equal(env.clock.source(), 'device');
+  assert.equal(env.deviceReads, 1);
+});
+
+test('첫 요청의 네트워크 오류, HTTP 오류 또는 잘못된 응답에는 처음 읽은 기기 시각을 사용합니다', async () => {
   const responses = [
     () => { throw new TypeError('network failure'); },
     () => Response.json({}, { status: 503 }),
@@ -64,13 +81,14 @@ test('네트워크 오류, HTTP 오류 또는 잘못된 응답이면 이전 동�
     () => Response.json({ unix_ms: 8640000000000001, unix: 8640000000000 }),
   ];
   for (const response of responses) {
-    let next = validResponse;
-    const env = setup(async () => next());
+    let attempts = 0;
+    const env = setup(async () => { attempts++; return response(); });
+    const initialTime = env.device;
     await env.clock.sync();
-    assert.equal(env.clock.now(), serverNow);
-    next = response;
+    env.advance(1000, -60000);
     await env.clock.sync();
-    assert.equal(env.clock.now(), env.device);
+    assert.equal(attempts, 1);
+    assert.equal(env.clock.now(), initialTime + 1000);
     assert.equal(env.clock.source(), 'device');
   }
 });
@@ -89,7 +107,7 @@ test('응답 본문이 지연되어도 요청을 중단하고 기기 시계를 �
   assert.equal(env.clock.now(), env.device);
 });
 
-test('동시 요청을 합치고 취소한 응답은 새 동기화 결과를 덮어쓰지 않습니다', async () => {
+test('처음 요청은 하나만 보내고 취소 뒤 도착한 응답은 사용하지 않습니다', async () => {
   let resolveFirst;
   let firstSignal;
   let attempts = 0;
@@ -101,11 +119,12 @@ test('동시 요청을 합치고 취소한 응답은 새 동기화 결과를 덮
   const oldSync = env.clock.sync();
   await env.clock.sync();
   assert.equal(attempts, 1);
-  env.clock.useDeviceTime();
+  env.clock.cancelSync();
   assert.equal(firstSignal.aborted, true);
   await env.clock.sync();
-  assert.equal(attempts, 2);
+  assert.equal(attempts, 1);
   resolveFirst(Response.json({ unix_ms: serverNow - 1000, unix: serverNow / 1000 - 1 }));
   await oldSync;
-  assert.equal(env.clock.now(), serverNow);
+  assert.equal(env.clock.now(), env.device);
+  assert.equal(env.clock.source(), 'device');
 });

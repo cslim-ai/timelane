@@ -13,8 +13,9 @@ const maxVisibleHours = 25;
 const dragThreshold = 8;
 const wheelPixelsPerHour = 100;
 const wheelLinesPerHour = 3;
-const syncInterval = 120_000;
+const SECOND = 1000;
 const currentClock = createCurrentClock();
+const liveClock = $('live-time');
 const clockSource = $('clock-source');
 const clockSourceIcon = clockSource.querySelector('.clock-source-icon');
 const initialTime = currentClock.now();
@@ -23,6 +24,7 @@ let visibleHours, displayedWindow, followingNow = true;
 let timelinePointer = null, suppressTimelineClick = false;
 let wheelOffset = 0;
 let searchItems = [], searchIndex = -1, toastTimer;
+let liveClockChars = [], clockTimer, displayedMinute, pageActive = true;
 let startupNotice = '';
 applyTranslations(document, locale);
 try { state = loadClockState(localStorage, initialTime); }
@@ -88,6 +90,7 @@ function render(instant = displayedWindow?.center.start ?? currentClock.now(), s
   scroller.scrollLeft = (scroller.scrollWidth - scroller.clientWidth) / 2;
   const now = currentClock.now();
   updateLiveTime(now);
+  updateTimelineNow(now);
   updateCityReadings(selectedInstant ?? now);
   updateComparison();
 }
@@ -138,15 +141,26 @@ function renderTimeline() {
   }).join('');
 }
 function updateLiveTime(now) {
-  const clock = $('live-time');
-  clock.textContent = formatTime(now, SEOUL_ZONE, state.format, locale, true);
-  clock.dateTime = new Date(now).toISOString();
+  const characters = [...formatTime(now, SEOUL_ZONE, state.format, locale, true)];
+  if (liveClockChars.length !== characters.length) {
+    liveClockChars = characters.map(character => document.createTextNode(character));
+    liveClock.replaceChildren(...liveClockChars);
+  } else {
+    for (const [index, character] of characters.entries()) {
+      if (liveClockChars[index].data !== character) liveClockChars[index].data = character;
+    }
+  }
+  const dateTime = new Date(Math.floor(now / SECOND) * SECOND).toISOString();
+  if (liveClock.dateTime !== dateTime) liveClock.dateTime = dateTime;
   const source = currentClock.source();
   if (source !== clockSource.dataset.source) {
     clockSource.dataset.source = source;
     $('clock-source-tooltip').textContent = source === 'server' ? text.clockServerSource : text.clockDeviceSource;
   }
+}
 
+function updateTimelineNow(now) {
+  displayedMinute = Math.floor(now / MINUTE) * MINUTE;
   const timeline = $('timeline');
   const currentSlot = slots.findIndex(slot => now >= slot.start && now < slot.end);
   const currentCells = `[data-axis-cell="${currentSlot}"], [data-cell="${currentSlot}"]`;
@@ -157,20 +171,26 @@ function updateLiveTime(now) {
     if (!cell.hasAttribute('aria-current')) cell.setAttribute('aria-current', 'time');
   }
 
-  const position = currentSlot < 0 ? 0 : percent(now);
+  const hidden = currentSlot < 0;
+  const position = hidden ? 0 : percent(Math.max(displayedMinute, slots[currentSlot].start));
   for (const line of timeline.querySelectorAll('.now-line')) {
-    line.hidden = currentSlot < 0;
-    if (!line.hidden) line.style.left = `${position}%`;
+    if (line.hidden !== hidden) line.hidden = hidden;
+    if (!hidden) line.style.left = `${position}%`;
   }
+}
+function updateText(element, value) {
+  if (element.textContent !== value) element.textContent = value;
 }
 function updateCityReadings(instant) {
   for (const row of $('timeline').querySelectorAll('.city-row')) {
     const place = localizedCity(row.dataset.id);
-    row.querySelector('.city-clock').textContent = formatTime(instant, place.zone, state.format, locale);
-    row.querySelector('.city-date').textContent = shortDate(instant, place.zone, locale);
+    updateText(row.querySelector('.city-clock'), formatTime(instant, place.zone, state.format, locale));
+    updateText(row.querySelector('.city-date'), shortDate(instant, place.zone, locale));
     const abbreviation = zoneAbbreviation(instant, place.zone);
-    row.querySelector('.zone-abbreviation').textContent = ` · ${abbreviation}`;
-    row.querySelector('.city-zone').title = `${place.country} · ${abbreviation} (${place.zone})`;
+    updateText(row.querySelector('.zone-abbreviation'), ` · ${abbreviation}`);
+    const zone = row.querySelector('.city-zone');
+    const title = `${place.country} · ${abbreviation} (${place.zone})`;
+    if (zone.title !== title) zone.title = title;
   }
 }
 function updateComparison() {
@@ -447,44 +467,39 @@ document.addEventListener('keydown', event => {
   updateComparison();
 });
 function tick() {
-  if (document.hidden) return;
+  clearTimeout(clockTimer);
+  if (!pageActive || document.hidden) return;
   const now = currentClock.now();
   const { start, end } = displayedWindow.center;
   if (followingNow && !timelinePointer && selectedInstant === null && hoverInstant === null && (now < start || now >= end)) {
     render(now);
-    return;
+  } else {
+    updateLiveTime(now);
+    if (Math.floor(now / MINUTE) * MINUTE !== displayedMinute) {
+      updateTimelineNow(now);
+      if (selectedInstant === null) updateCityReadings(now);
+    }
   }
-  updateLiveTime(now);
-  if (selectedInstant === null) updateCityReadings(now);
-}
-async function refreshClock() {
-  if (document.hidden) return;
-  await currentClock.sync();
-  tick();
+  const nextSecond = (Math.floor(now / SECOND) + 1) * SECOND;
+  clockTimer = setTimeout(tick, Math.max(0, Math.min(SECOND, nextSecond - currentClock.now())));
 }
 
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden) return;
-  tick();
-  refreshClock();
-});
-window.addEventListener('offline', () => {
-  currentClock.useDeviceTime();
+document.addEventListener('visibilitychange', tick);
+window.addEventListener('pageshow', event => {
+  if (!event.persisted) return;
+  pageActive = true;
   tick();
 });
-window.addEventListener('online', refreshClock);
-window.addEventListener('pageshow', event => { if (event.persisted) refreshClock(); });
-const clock = setInterval(tick, 1000);
-const clockSync = setInterval(refreshClock, syncInterval);
 render();
-refreshClock();
+tick();
+currentClock.sync().then(tick);
 const timelineResize = new ResizeObserver(() => { if (measureVisibleHours() !== visibleHours) render(); });
 timelineResize.observe($('timeline-scroll'));
 window.addEventListener('pagehide', event => {
-  currentClock.useDeviceTime();
+  pageActive = false;
+  clearTimeout(clockTimer);
   if (event.persisted) return;
-  clearInterval(clock);
-  clearInterval(clockSync);
+  currentClock.cancelSync();
   timelineResize.disconnect();
 });
 if (startupNotice) { $('save-status').textContent = startupNotice; notify(startupNotice, true); }
