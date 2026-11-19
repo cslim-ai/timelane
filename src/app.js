@@ -86,7 +86,9 @@ function render(instant = displayedWindow?.center.start ?? currentClock.now(), s
   renderTimeline();
   const scroller = $('timeline-scroll');
   scroller.scrollLeft = (scroller.scrollWidth - scroller.clientWidth) / 2;
-  updateLiveTime(currentClock.now());
+  const now = currentClock.now();
+  updateLiveTime(now);
+  updateCityReadings(selectedInstant ?? now);
   updateComparison();
 }
 function hourLabel(instant, place) {
@@ -143,15 +145,6 @@ function updateLiveTime(now) {
   }
 
   const timeline = $('timeline');
-  for (const row of timeline.querySelectorAll('.city-row')) {
-    const place = localizedCity(row.dataset.id);
-    row.querySelector('.city-clock').textContent = formatTime(now, place.zone, state.format, locale);
-    row.querySelector('.city-date').textContent = shortDate(now, place.zone, locale);
-    const abbreviation = zoneAbbreviation(now, place.zone);
-    row.querySelector('.zone-abbreviation').textContent = ` · ${abbreviation}`;
-    row.querySelector('.city-zone').title = `${place.country} · ${abbreviation} (${place.zone})`;
-  }
-
   const currentSlot = slots.findIndex(slot => now >= slot.start && now < slot.end);
   const currentCells = `[data-axis-cell="${currentSlot}"], [data-cell="${currentSlot}"]`;
   for (const cell of timeline.querySelectorAll('[aria-current="time"]')) {
@@ -165,6 +158,16 @@ function updateLiveTime(now) {
   for (const line of timeline.querySelectorAll('.now-line')) {
     line.hidden = currentSlot < 0;
     if (!line.hidden) line.style.left = `${position}%`;
+  }
+}
+function updateCityReadings(instant) {
+  for (const row of $('timeline').querySelectorAll('.city-row')) {
+    const place = localizedCity(row.dataset.id);
+    row.querySelector('.city-clock').textContent = formatTime(instant, place.zone, state.format, locale);
+    row.querySelector('.city-date').textContent = shortDate(instant, place.zone, locale);
+    const abbreviation = zoneAbbreviation(instant, place.zone);
+    row.querySelector('.zone-abbreviation').textContent = ` · ${abbreviation}`;
+    row.querySelector('.city-zone').title = `${place.country} · ${abbreviation} (${place.zone})`;
   }
 }
 function updateComparison() {
@@ -207,6 +210,7 @@ function selectTime(cell) {
   followingNow = false;
 
   if (instant === displayedWindow.center.start) {
+    updateCityReadings(instant);
     updateComparison();
     return;
   }
@@ -431,7 +435,9 @@ document.addEventListener('keydown', event => {
     setClockTooltip(false);
     return;
   }
-  closeSearch(); selectedInstant = null; hoverInstant = null; updateComparison();
+  closeSearch(); selectedInstant = null; hoverInstant = null;
+  updateCityReadings(currentClock.now());
+  updateComparison();
 });
 function tick() {
   if (document.hidden) return;
@@ -442,6 +448,7 @@ function tick() {
     return;
   }
   updateLiveTime(now);
+  if (selectedInstant === null) updateCityReadings(now);
 }
 async function refreshClock() {
   if (document.hidden) return;
