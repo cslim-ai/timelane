@@ -413,6 +413,8 @@ const messages = {
     evening: 'Evening',
     night: 'Night',
     cityLocalTime: 'City · Local time',
+    axisCurrent: 'Now',
+    axisSelected: 'Selected',
     comparisonHint: 'Click an hour to center it. Drag or scroll over the timeline to browse.',
     saved: 'Your cities are saved in this browser.',
     storageUnavailable: 'Browser storage is unavailable. Changes last only in this tab.',
@@ -457,6 +459,8 @@ const messages = {
     evening: '저녁',
     night: '밤',
     cityLocalTime: '도시 · 현지 시각',
+    axisCurrent: '현재',
+    axisSelected: '선택',
     comparisonHint: '시간 칸을 클릭해 가운데에 놓으세요. 시간표는 드래그하거나 휠을 돌려 이동할 수 있습니다.',
     saved: '도시 목록은 이 브라우저에 저장됩니다.',
     storageUnavailable: '브라우저 저장소를 사용할 수 없어 변경 내용은 현재 탭에서만 유지됩니다.',
@@ -675,7 +679,10 @@ function renderTimeline() {
   timeline.innerHTML = `<div class="axis-row"><div class="axis-label">${escape(text.cityLocalTime)}</div><div class="axis-hours">${before}${slots.map((slot, index) => {
     const p = zonedParts(slot.start, SEOUL_ZONE);
     const hour = state.format === '12' ? p.hour % 12 || 12 : pad(p.hour);
-    return `<span data-axis-cell="${index}">${hour}</span>`;
+    return `<span class="axis-cell" data-axis-cell="${index}">
+      <span class="axis-status"><span class="axis-status-current">${escape(text.axisCurrent)}</span><span class="axis-status-selected">${escape(text.axisSelected)}</span></span>
+      <span class="axis-hour">${hour}</span>
+    </span>`;
   }).join('')}${after}</div></div>` + state.locations.map((id, rowIndex) => {
     const place = localizedCity(id);
     const fixed = place.id === 'seoul';
@@ -738,18 +745,23 @@ function updateCityReadings(instant) {
   }
 }
 function updateComparison() {
+  const timeline = $('timeline');
   const instant = hoverInstant ?? selectedInstant;
   const comparing = instant !== null;
   const preview = hoverInstant === selectedInstant ? null : hoverInstant;
   const index = preview === null ? -1 : slots.findIndex(slot => preview >= slot.start && preview < slot.end);
-  document.querySelectorAll('.comparison-band').forEach(band => {
+  timeline.querySelectorAll('.comparison-band').forEach(band => {
     band.hidden = index < 0;
     if (index < 0) return;
     band.style.left = `${percent(slots[index].start)}%`;
     band.style.width = `${percent(slots[index].end) - percent(slots[index].start)}%`;
   });
-  document.querySelectorAll('.time-cell').forEach(cell => {
-    const selected = selectedInstant === slots[Number(cell.dataset.cell)]?.start;
+  const selectedIndex = slots.findIndex(slot => slot.start === selectedInstant);
+  for (const cell of timeline.querySelectorAll('[data-axis-cell]')) {
+    cell.toggleAttribute('data-selected', Number(cell.dataset.axisCell) === selectedIndex);
+  }
+  timeline.querySelectorAll('.time-cell').forEach(cell => {
+    const selected = Number(cell.dataset.cell) === selectedIndex;
     if (cell.getAttribute('aria-pressed') !== String(selected)) cell.setAttribute('aria-pressed', String(selected));
   });
   $('comparison-status').textContent = comparing
