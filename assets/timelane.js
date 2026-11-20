@@ -401,7 +401,6 @@ const messages = {
     searchResults: 'City search results',
     previousDay: 'Previous day',
     nextDay: 'Next day',
-    comparisonDate: 'Comparison date',
     timeFormat: 'Time format',
     twentyFourHours: '24-hour',
     twelveHours: '12-hour',
@@ -420,7 +419,6 @@ const messages = {
     storageUnavailable: 'Browser storage is unavailable. Changes last only in this tab.',
     loadError: 'Your cities could not be loaded. The default list is shown.',
     actionError: 'This action could not be completed.',
-    invalidDate: 'Choose a valid date from 1900 to 2100.',
     noResults: 'No results. Try a city name or IANA time zone.',
     cityLimit: limit => `You can add up to ${limit} cities, including Seoul.`,
     moveUp: city => `Move ${city} up`,
@@ -447,7 +445,6 @@ const messages = {
     searchResults: '도시 검색 결과',
     previousDay: '이전 날짜',
     nextDay: '다음 날짜',
-    comparisonDate: '비교 날짜',
     timeFormat: '시간 표시 형식',
     twentyFourHours: '24시간',
     twelveHours: '12시간',
@@ -466,7 +463,6 @@ const messages = {
     storageUnavailable: '브라우저 저장소를 사용할 수 없어 변경 내용은 현재 탭에서만 유지됩니다.',
     loadError: '도시 목록을 읽을 수 없어 기본 화면을 열었습니다.',
     actionError: '작업을 완료할 수 없습니다.',
-    invalidDate: '1900년부터 2100년 사이의 올바른 날짜를 선택해 주세요.',
     noResults: '검색 결과가 없습니다. 도시 이름이나 IANA 시간대로 검색해 보세요.',
     cityLimit: limit => `도시는 서울을 포함해 최대 ${limit}개까지 추가할 수 있습니다.`,
     moveUp: city => `${city} 위로`,
@@ -565,7 +561,7 @@ return { createCurrentClock };
 
 // app.js
 modules["app"] = (() => {
-const { HOUR, MINUTE, zonedParts, dateString, pad, wallToInstant, parseDate, addDays, formatTime, shortDate, utcOffset, zoneAbbreviation } = modules["time"];
+const { HOUR, MINUTE, zonedParts, dateString, pad, wallToInstant, addDays, formatTime, shortDate, utcOffset, zoneAbbreviation } = modules["time"];
 const { getLocation, searchLocations, displayLocation } = modules["locations"];
 const { SEOUL_ZONE, MAX_CITIES, MIN_CLOCK_DATE, MAX_CLOCK_DATE, createClockState, validateClockState, loadClockState, saveClockState, reorderCities, clockWindow } = modules["clock-state"];
 const { selectLocale, messages, applyTranslations } = modules["locale"];
@@ -646,8 +642,9 @@ function render(instant = displayedWindow?.center.start ?? currentClock.now(), s
   displayedWindow = clockWindow(instant, visibleHours, shift);
   slots = displayedWindow.slots;
   state.date = displayedWindow.date;
-  $('date-label').textContent = referenceDate.format(displayedWindow.center.start);
-  $('date-picker').value = state.date;
+  const dateLabel = $('date-label');
+  dateLabel.dateTime = state.date;
+  dateLabel.textContent = referenceDate.format(displayedWindow.center.start);
   $('time-format').value = state.format;
   $('reference-offset').textContent = utcOffset(displayedWindow.center.start, SEOUL_ZONE);
   $('previous-day').disabled = state.date === MIN_CLOCK_DATE;
@@ -927,16 +924,6 @@ document.addEventListener('pointerdown', event => {
 on('previous-day', 'click', () => changeDate(addDays(state.date, -1)));
 on('next-day', 'click', () => changeDate(addDays(state.date, 1)));
 on('current-time', 'click', returnToNow);
-on('date-picker', 'change', event => {
-  const date = event.target.value;
-  try { parseDate(date); }
-  catch {
-    event.target.value = state.date;
-    notify(text.invalidDate, true);
-    return;
-  }
-  changeDate(date);
-});
 on('time-format', 'change', event => commit(() => { state.format = event.target.value; }));
 on('timeline', 'wheel', scrollTimeline, { passive: false });
 on('timeline', 'pointerdown', beginTimelinePointer);

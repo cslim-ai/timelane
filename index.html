@@ -7,8 +7,8 @@
   <meta name="description" content="Compare local times around the world with Seoul as a reference." data-i18n-content="description">
   <title data-i18n="title">TimeLane · World Clock</title>
   <link rel="icon" href="./assets/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./src/styles.css?v=8">
-  <script defer src="./assets/timelane.js?v=11"></script>
+  <link rel="stylesheet" href="./src/styles.css?v=9">
+  <script defer src="./assets/timelane.js?v=12"></script>
 </head>
 <body>
   <a class="skip-link" href="#timeline" data-i18n="skipToTimeline">Skip to timeline</a>
@@ -40,7 +40,7 @@
         </div>
         <div class="date-navigation">
           <button id="previous-day" class="icon-button" aria-label="Previous day" data-i18n-label="previousDay">‹</button>
-          <label class="date-field"><span id="date-label"></span><input id="date-picker" type="date" min="1900-01-01" max="2100-12-31" aria-label="Comparison date" data-i18n-label="comparisonDate"></label>
+          <time id="date-label" class="date-field"></time>
           <button id="next-day" class="icon-button" aria-label="Next day" data-i18n-label="nextDay">›</button>
         </div>
         <label class="format-field"><span class="sr-only" data-i18n="timeFormat">Time format</span><select id="time-format"><option value="24" data-i18n="twentyFourHours">24-hour</option><option value="12" data-i18n="twelveHours">12-hour</option></select></label>

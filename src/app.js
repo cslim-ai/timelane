@@ -1,4 +1,4 @@
-import { HOUR, MINUTE, zonedParts, dateString, pad, wallToInstant, parseDate, addDays, formatTime, shortDate, utcOffset, zoneAbbreviation } from './time.js';
+import { HOUR, MINUTE, zonedParts, dateString, pad, wallToInstant, addDays, formatTime, shortDate, utcOffset, zoneAbbreviation } from './time.js';
 import { getLocation, searchLocations, displayLocation } from './locations.js';
 import { SEOUL_ZONE, MAX_CITIES, MIN_CLOCK_DATE, MAX_CLOCK_DATE, createClockState, validateClockState, loadClockState, saveClockState, reorderCities, clockWindow } from './clock-state.js';
 import { selectLocale, messages, applyTranslations } from './locale.js';
@@ -79,8 +79,9 @@ function render(instant = displayedWindow?.center.start ?? currentClock.now(), s
   displayedWindow = clockWindow(instant, visibleHours, shift);
   slots = displayedWindow.slots;
   state.date = displayedWindow.date;
-  $('date-label').textContent = referenceDate.format(displayedWindow.center.start);
-  $('date-picker').value = state.date;
+  const dateLabel = $('date-label');
+  dateLabel.dateTime = state.date;
+  dateLabel.textContent = referenceDate.format(displayedWindow.center.start);
   $('time-format').value = state.format;
   $('reference-offset').textContent = utcOffset(displayedWindow.center.start, SEOUL_ZONE);
   $('previous-day').disabled = state.date === MIN_CLOCK_DATE;
@@ -360,16 +361,6 @@ document.addEventListener('pointerdown', event => {
 on('previous-day', 'click', () => changeDate(addDays(state.date, -1)));
 on('next-day', 'click', () => changeDate(addDays(state.date, 1)));
 on('current-time', 'click', returnToNow);
-on('date-picker', 'change', event => {
-  const date = event.target.value;
-  try { parseDate(date); }
-  catch {
-    event.target.value = state.date;
-    notify(text.invalidDate, true);
-    return;
-  }
-  changeDate(date);
-});
 on('time-format', 'change', event => commit(() => { state.format = event.target.value; }));
 on('timeline', 'wheel', scrollTimeline, { passive: false });
 on('timeline', 'pointerdown', beginTimelinePointer);
